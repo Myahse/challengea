@@ -4,6 +4,7 @@ import '../chat_store.dart';
 import '../models.dart';
 import '../theme.dart';
 import '../widgets/avatar.dart';
+import '../games/challenge.dart';
 import 'call_screen.dart';
 import 'profile_screen.dart';
 
@@ -128,7 +129,7 @@ class _ChatScreenState extends State<ChatScreen> {
             onPressed: () => _startCall(),
             icon: const Icon(Icons.call_outlined),
           ),
-          IconButton(onPressed: () {}, icon: const Icon(Icons.more_vert)),
+          IconButton(onPressed: _menu, icon: const Icon(Icons.more_vert)),
         ],
       ),
       body: Column(
@@ -164,7 +165,119 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
+  void _menu() {
+    showModalBottomSheet(
+      context: context,
+      showDragHandle: true,
+      backgroundColor: Colors.white,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.sports_esports_outlined),
+              title: Text(
+                node.isGroup
+                    ? 'Challenge someone from the group'
+                    : 'Challenge ${node.displayName} to a game',
+                style: tx(15, weight: FontWeight.w500),
+              ),
+              onTap: () async {
+                Navigator.pop(ctx);
+                final friend = node.isGroup
+                    ? await _pickMember()
+                    : node.members.first;
+                if (friend != null && mounted) {
+                  challengeFriend(context, widget.store, friend);
+                }
+              },
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<Person?> _pickMember() => showModalBottomSheet<Person>(
+    context: context,
+    showDragHandle: true,
+    backgroundColor: Colors.white,
+    builder: (ctx) => SafeArea(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          for (final p in node.members)
+            ListTile(
+              leading: PersonAvatar(p, diameter: 36),
+              title: Text(p.name, style: tx(15, weight: FontWeight.w500)),
+              onTap: () => Navigator.pop(ctx, p),
+            ),
+        ],
+      ),
+    ),
+  );
+
+  /// Game result card with a Rematch button.
+  Widget _gameCard(Message m) {
+    final g = m.game!;
+    final friend = node.isGroup ? null : node.members.first;
+    return Align(
+      alignment: Alignment.center,
+      child: Container(
+        width: MediaQuery.sizeOf(context).width * .78,
+        margin: const EdgeInsets.only(bottom: 12, top: 2),
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: const Color(0xFFE6E6E6)),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 46,
+              height: 46,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(12),
+                gradient: LinearGradient(colors: g.colors),
+              ),
+              child: Icon(g.icon, color: Colors.white),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    g.name,
+                    style: tx(
+                      12,
+                      weight: FontWeight.w700,
+                      color: AppColors.muted,
+                    ),
+                  ),
+                  Text(m.text, style: tx(14, weight: FontWeight.w600)),
+                ],
+              ),
+            ),
+            if (friend != null)
+              TextButton(
+                onPressed: () =>
+                    startChallenge(context, widget.store, friend, g),
+                child: Text(
+                  'Rematch',
+                  style: tx(13, weight: FontWeight.w700, color: AppColors.ink),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _bubble(Message m) {
+    if (m.game != null) return _gameCard(m);
     final mine = m.isMine;
     return Align(
       alignment: mine ? Alignment.centerRight : Alignment.centerLeft,

@@ -2,6 +2,8 @@ import 'dart:math';
 
 import 'package:flutter/material.dart';
 
+import 'games/games.dart';
+
 class Person {
   const Person(this.id, this.name, this.color, {this.online = true});
   final String id;
@@ -15,9 +17,12 @@ class Person {
 }
 
 class Message {
-  Message(this.text, {this.sender, DateTime? time})
+  Message(this.text, {this.sender, DateTime? time, this.game})
     : time = time ?? DateTime.now();
   final String text;
+
+  /// Set for game results posted in the chat (shows a Rematch button).
+  final GameInfo? game;
   final Person? sender; // null = me
   final DateTime time;
   bool get isMine => sender == null;

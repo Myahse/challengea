@@ -29,6 +29,18 @@ Prototype of the **Challengea** screens (MOBILE section of the Figma file
    followers / following / likes, Message, bio, sticky tabs
    posts / Videos / Stories / tags and the grid (tap to watch).
 
+7. **Games ("Tales")**: challenge a friend 1 vs 1 from the Tales tiles,
+   Explore, the **Challenge** button on a friend's map card, the ⋮ menu of a
+   chat, or during a 1-to-1 call. The friend accepts, you play, and the result
+   is posted in your chat with a **Rematch** button.
+   - **Sudoku duel**: same grid for both, live progress bars, 3 mistakes
+     and you lose, 3 hints.
+   - **Arcade = Four in a row**: turn by turn, falling discs, the friend
+     blocks your lines.
+   - Rumble dash and Purple raw: "soon".
+   The friend's moves are simulated for now; online matches need the backend
+   (invites by push notification, moves over WebSocket).
+
 Videos and photos are animated colour placeholders until the backend stores
 real media (then `video_player` / cached images replace `FakeVideo`).
 
@@ -78,4 +90,5 @@ flutter run -d chrome  # browser
 - `lib/widgets/map_markers.dart`, `friend_profile_sheet.dart`, `city_map.dart` — pins, friend card, drawn map
 - `lib/call.dart`, `lib/screens/call_screen.dart`, `lib/widgets/call_banner.dart` — calls
 - `lib/feed.dart`, `lib/screens/video_feed.dart`, `lib/screens/profile_screen.dart`, `lib/widgets/comments_sheet.dart`, `product_sheet.dart`, `fake_video.dart` — videos, profiles, shop
+- `lib/games/` — games list, challenge flow, Sudoku duel, Four in a row (logic is in `*_logic.dart`, tested)
 - `lib/theme.dart` — colors and text styles from Figma (one place to update)

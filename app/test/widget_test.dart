@@ -1,6 +1,12 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:challengea/chat_store.dart';
+import 'dart:math';
+
 import 'package:flutter/material.dart';
+import 'package:challengea/games/challenge.dart';
+import 'package:challengea/games/four_logic.dart';
+import 'package:challengea/games/games.dart';
+import 'package:challengea/games/sudoku_logic.dart';
 import 'package:challengea/main.dart';
 import 'package:challengea/screens/chat_home.dart';
 import 'package:challengea/screens/map_screen.dart';
@@ -145,6 +151,54 @@ void main() {
     expect(find.text('45 tags'), findsOneWidget);
     await tester.tap(find.text('Follow'));
     await tester.pump(const Duration(milliseconds: 300));
-    expect(find.text('Following'), findsNWidgets(2)); // the button + the "Following" stat tile
+    expect(
+      find.text('Following'),
+      findsNWidgets(2),
+    ); // the button + the "Following" stat tile
+  });
+
+  test('sudoku: generated grids are valid and duels share the same puzzle', () {
+    for (final seed in [1, 2, 42, 999]) {
+      final p = SudokuPuzzle.generate(seed: seed);
+      expect(SudokuPuzzle.isValidSolution(p.solution), isTrue);
+      expect(p.blanks, 42);
+      for (var i = 0; i < 81; i++) {
+        final g = p.givens[i ~/ 9][i % 9];
+        if (g != 0) expect(g, p.solution[i ~/ 9][i % 9]);
+      }
+    }
+    expect(
+      SudokuPuzzle.generate(seed: 7).givens,
+      SudokuPuzzle.generate(seed: 7).givens,
+    );
+  });
+
+  test('four in a row: detects wins and the friend blocks or wins', () {
+    final b = FourBoard();
+    for (var c = 0; c < 3; c++) {
+      b.drop(c, 1);
+    }
+    // I threaten column 3: the friend must block it.
+    expect(b.pickMove(Random(1)), 3);
+    b.drop(3, 1);
+    expect(b.winLine(1), [(5, 0), (5, 1), (5, 2), (5, 3)]);
+
+    final w = FourBoard();
+    for (var i = 0; i < 3; i++) {
+      w.drop(6, 2);
+    }
+    expect(w.pickMove(Random(1)), 6); // friend takes its own win first
+  });
+
+  testWidgets('winning a game posts the result in the chat with a Rematch', (
+    tester,
+  ) async {
+    final store = ChatStore();
+    final marc = store.friends.firstWhere((p) => p.name == 'Marc');
+    postResult(store, marc, fourInRow, 'I won', won: true);
+    final node = store.nodeFor(marc);
+    expect(node.messages.last.game, fourInRow);
+    await tester.pump(const Duration(seconds: 2));
+    expect(node.messages.last.sender, marc); // the friend answers
   });
 }

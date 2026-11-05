@@ -3,6 +3,8 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 
 import '../chat_store.dart';
+import '../games/challenge.dart';
+import '../games/games.dart';
 import '../models.dart';
 import '../theme.dart';
 import '../widgets/avatar.dart';
@@ -173,6 +175,58 @@ class _ChatHomeState extends State<ChatHome> {
     );
   }
 
+  /// All games, with a short description.
+  void _explore() {
+    showModalBottomSheet(
+      context: context,
+      showDragHandle: true,
+      backgroundColor: Colors.white,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('Tales', style: tx(18, weight: FontWeight.w700)),
+            Text(
+              'Challenge your friends 1 vs 1',
+              style: tx(13, color: AppColors.muted),
+            ),
+            const SizedBox(height: 8),
+            for (final g in allGames)
+              ListTile(
+                leading: Container(
+                  width: 46,
+                  height: 46,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(12),
+                    gradient: LinearGradient(colors: g.colors),
+                  ),
+                  child: Icon(g.icon, color: Colors.white),
+                ),
+                title: Text(g.name, style: tx(15, weight: FontWeight.w600)),
+                subtitle: Text(
+                  g.tagline,
+                  style: tx(12, color: AppColors.muted),
+                ),
+                trailing: g.playable
+                    ? FilledButton(
+                        style: FilledButton.styleFrom(
+                          backgroundColor: AppColors.ink,
+                        ),
+                        onPressed: () {
+                          Navigator.pop(ctx);
+                          challengeWithGame(context, store, g);
+                        },
+                        child: const Text('Play'),
+                      )
+                    : Text('Soon', style: tx(13, color: AppColors.muted)),
+              ),
+            const SizedBox(height: 12),
+          ],
+        ),
+      ),
+    );
+  }
+
   /// Alternative to dragging bubbles: pick friends from a list.
   void _newGroup() {
     final picked = <Person>{};
@@ -257,7 +311,10 @@ class _ChatHomeState extends State<ChatHome> {
           children: [
             _Header(me: store.me),
             const SizedBox(height: 14),
-            const _TalesRow(),
+            _TalesRow(
+              onPlay: (g) => challengeWithGame(context, store, g),
+              onExplore: _explore,
+            ),
             Padding(
               padding: const EdgeInsets.fromLTRB(18, 22, 18, 0),
               child: Row(
@@ -377,28 +434,11 @@ class _Header extends StatelessWidget {
   }
 }
 
-/// "Tales" = the games row. Tiles are placeholders until the final game art.
+/// "Tales" = the games row. Tap a game to challenge a friend.
 class _TalesRow extends StatelessWidget {
-  const _TalesRow();
-
-  static const _games = [
-    ('Sudoku', Icons.grid_view_rounded, [Color(0xFF3FD0FF), Color(0xFFFF4FA3)]),
-    (
-      'Arcade',
-      Icons.sports_esports_rounded,
-      [Color(0xFFFFE066), Color(0xFF2DBE60)],
-    ),
-    (
-      'Rumble dash',
-      Icons.directions_run_rounded,
-      [Color(0xFF3D7BFF), Color(0xFFFFB13D)],
-    ),
-    (
-      'Purple raw',
-      Icons.favorite_rounded,
-      [Color(0xFFFFC94D), Color(0xFF7A2BC2)],
-    ),
-  ];
+  const _TalesRow({required this.onPlay, required this.onExplore});
+  final ValueChanged<GameInfo> onPlay;
+  final VoidCallback onExplore;
 
   @override
   Widget build(BuildContext context) {
@@ -413,17 +453,21 @@ class _TalesRow extends StatelessWidget {
               const SizedBox(width: 4),
               Text('Tales', style: tx(17, weight: FontWeight.w700)),
               const Spacer(),
-              Container(
-                padding: const EdgeInsets.fromLTRB(14, 4, 8, 4),
-                decoration: BoxDecoration(
-                  border: Border.all(color: AppColors.ink),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Row(
-                  children: [
-                    Text('Explore', style: tx(13, weight: FontWeight.w600)),
-                    const Icon(Icons.chevron_right, size: 16),
-                  ],
+              InkWell(
+                borderRadius: BorderRadius.circular(20),
+                onTap: onExplore,
+                child: Container(
+                  padding: const EdgeInsets.fromLTRB(14, 4, 8, 4),
+                  decoration: BoxDecoration(
+                    border: Border.all(color: AppColors.ink),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Row(
+                    children: [
+                      Text('Explore', style: tx(13, weight: FontWeight.w600)),
+                      const Icon(Icons.chevron_right, size: 16),
+                    ],
+                  ),
                 ),
               ),
             ],
@@ -435,10 +479,10 @@ class _TalesRow extends StatelessWidget {
           child: ListView.separated(
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: 16),
-            itemCount: _games.length + 1,
+            itemCount: allGames.length + 1,
             separatorBuilder: (_, _) => const SizedBox(width: 10),
             itemBuilder: (context, i) {
-              if (i == _games.length) {
+              if (i == allGames.length) {
                 return Container(
                   width: 88,
                   height: 88,
@@ -448,25 +492,57 @@ class _TalesRow extends StatelessWidget {
                   ),
                 );
               }
-              final (name, icon, colors) = _games[i];
-              return Column(
-                children: [
-                  Container(
-                    width: 88,
-                    height: 88,
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(18),
-                      gradient: LinearGradient(
-                        colors: colors,
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
+              final g = allGames[i];
+              return GestureDetector(
+                onTap: () => onPlay(g),
+                child: Column(
+                  children: [
+                    Container(
+                      width: 88,
+                      height: 88,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(18),
+                        gradient: LinearGradient(
+                          colors: g.colors,
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                      ),
+                      child: Stack(
+                        children: [
+                          Center(
+                            child: Icon(g.icon, size: 44, color: Colors.white),
+                          ),
+                          if (!g.playable)
+                            Positioned(
+                              right: 6,
+                              top: 6,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 5,
+                                  vertical: 1,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.black38,
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Text(
+                                  'soon',
+                                  style: tx(
+                                    9,
+                                    weight: FontWeight.w700,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ),
+                            ),
+                        ],
                       ),
                     ),
-                    child: Icon(icon, size: 44, color: Colors.white),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(name, style: tx(10, weight: FontWeight.w500)),
-                ],
+                    const SizedBox(height: 4),
+                    Text(g.name, style: tx(10, weight: FontWeight.w500)),
+                  ],
+                ),
               );
             },
           ),

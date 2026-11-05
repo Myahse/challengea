@@ -7,6 +7,7 @@ import '../call.dart';
 import '../chat_store.dart';
 import '../models.dart';
 import '../theme.dart';
+import '../games/challenge.dart';
 import '../widgets/avatar.dart';
 
 /// Figma: "group call page" frames 28:97 (group) and 32:252 (calling Maurice).
@@ -198,10 +199,20 @@ class _CallScreenState extends State<CallScreen> with TickerProviderStateMixin {
                 style: tx(15, weight: FontWeight.w500),
               ),
               subtitle: Text(
-                'Coming with the games',
+                call.isGroup
+                    ? 'For 1-to-1 calls'
+                    : 'The call keeps going in the background',
                 style: tx(12, color: AppColors.muted),
               ),
-              enabled: false,
+              enabled: !call.isGroup,
+              onTap: () {
+                Navigator.pop(ctx); // close the menu
+                final friend = call.participants.first.person;
+                final nav = Navigator.of(context);
+                nav.pop(); // minimize the call (green bar)
+                call.setScreenOpen(false);
+                challengeFriend(nav.context, widget.store, friend);
+              },
             ),
           ],
         ),

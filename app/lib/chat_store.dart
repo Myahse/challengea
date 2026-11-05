@@ -388,6 +388,12 @@ class ChatStore extends ChangeNotifier {
     });
   }
 
+  /// Adds a message to a chat (game results, replies).
+  void post(BubbleNode node, Message m) {
+    node.messages.add(m);
+    notifyListeners();
+  }
+
   void markRead(BubbleNode node) {
     if (node.unread == 0) return;
     node.unread = 0;
