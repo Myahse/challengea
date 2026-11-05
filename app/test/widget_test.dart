@@ -1,8 +1,8 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:nteri/chat_store.dart';
+import 'package:challengea/chat_store.dart';
 import 'package:flutter/material.dart';
-import 'package:nteri/main.dart';
-import 'package:nteri/screens/chat_home.dart';
+import 'package:challengea/main.dart';
+import 'package:challengea/screens/chat_home.dart';
 
 void main() {
   testWidgets('chat home shows the bubble field', (tester) async {
@@ -12,12 +12,10 @@ void main() {
     expect(find.text('Maurice'), findsOneWidget);
   });
 
-  testWidgets('app starts on the splash then shows onboarding', (tester) async {
-    await tester.pumpWidget(NteriApp(store: ChatStore()));
-    expect(find.text('Powered by Djogana group'), findsOneWidget);
-    await tester.pump(const Duration(seconds: 2));
-    await tester.pump(const Duration(seconds: 1));
-    expect(find.text('S’inscrire'), findsOneWidget);
+  testWidgets('app opens on the chat home', (tester) async {
+    await tester.pumpWidget(ChallengeaApp(store: ChatStore()));
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(find.text('Tales'), findsOneWidget);
   });
 
   test('merging two friends creates a group, merging again adds to it', () {

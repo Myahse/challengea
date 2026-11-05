@@ -1,12 +1,10 @@
-# nteri — Flutter app (prototype)
+# Challengea — Flutter app (prototype)
 
-Prototype of the screens from the Figma file "Challengea - N'TERI":
+Prototype of the **Challengea** screens (MOBILE section of the Figma file
+"Challengea - N'TERI"; the NTERI part of that file is a separate project).
 
-1. **Splash** — logo + "Powered by Djogana group"
-2. **Onboarding** — 4 slides with the tilted card carousel, `?` opens *Contact support*
-3. **Sign up / log in** — phone number (+225, code by SMS — demo accepts any 6 digits) or email
-4. **Chat home** — the bubble chats described below
-5. **Conversation** — 1-to-1 and group chat
+1. **Chat home** — the bubble chats described below
+2. **Conversation** — 1-to-1 and group chat
 
 ## Bubble chats: what you can try
 
@@ -36,5 +34,4 @@ flutter run -d chrome  # browser
 - `lib/chat_store.dart` — friends, groups, messages (to be replaced by the Oracle-backed API)
 - `lib/screens/chat_home.dart` — header, Tales (games) row, bubble area, group sheet
 - `lib/screens/chat_screen.dart` — conversation screen
-- `lib/screens/splash.dart`, `onboarding.dart`, `auth.dart` — start of the app
 - `lib/theme.dart` — colors and text styles from Figma (one place to update)

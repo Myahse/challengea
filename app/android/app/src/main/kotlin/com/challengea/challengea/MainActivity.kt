@@ -1,4 +1,4 @@
-package ci.nteri.nteri
+package com.challengea.challengea
 
 import io.flutter.embedding.android.FlutterActivity
 

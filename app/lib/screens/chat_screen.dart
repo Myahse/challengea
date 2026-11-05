@@ -234,7 +234,7 @@ class _ChatScreenState extends State<ChatScreen> {
             if (hasText)
               IconButton(
                 onPressed: _send,
-                icon: const Icon(Icons.send_rounded, color: AppColors.brand),
+                icon: const Icon(Icons.send_rounded, color: AppColors.accent),
               )
             else ...[
               IconButton(

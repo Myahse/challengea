@@ -12,7 +12,7 @@ class AppColors {
   static const online = Color(0xFF34C759);
   static const badge = Color(0xFFFFD60A); // yellow unread counter
   static const storyRing = Color(0xFF8C6464);
-  static const brand = Color(0xFF22C55E); // green "i" of the nteri logo
+  static const accent = Color(0xFF22C55E); // send button / highlights
   static const mergeTarget = Color(0xFF34C759);
 }
 
@@ -38,7 +38,7 @@ ThemeData buildTheme() {
     fontFamily: 'Outfit',
     scaffoldBackgroundColor: Colors.white,
     colorScheme: ColorScheme.fromSeed(
-      seedColor: AppColors.brand,
+      seedColor: AppColors.accent,
       surface: Colors.white,
     ),
     snackBarTheme: const SnackBarThemeData(behavior: SnackBarBehavior.floating),
