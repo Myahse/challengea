@@ -59,7 +59,9 @@ void main() {
     tester.view.physicalSize = const Size(430, 932);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
-    await tester.pumpWidget(MaterialApp(home: MapScreen(store: ChatStore())));
+    await tester.pumpWidget(
+      MaterialApp(home: MapScreen(store: ChatStore(), useRealMap: false)),
+    );
     await tester.pump(const Duration(milliseconds: 100));
     await tester.tap(find.text('Celine'));
     await tester

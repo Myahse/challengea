@@ -10,9 +10,17 @@ Prototype of the **Challengea** screens (MOBILE section of the Figma file
    mini map, Challenge, Route). The filter button has **Ghost mode** and
    "show offline friends". Swipe from the left edge or tap the dots to go back.
 
-The map is drawn in code (Marcory / Koumassi, Abidjan) because the web
-prototype link cannot load real map tiles. The installed app will use a real
-map (flutter_map + OpenStreetMap or Google Maps) with real GPS positions.
+**Two maps, same screen:**
+- Installed app (Android / iOS): real **OpenStreetMap** map (`flutter_map`)
+  and your real **GPS position** (`geolocator`, asks permission; if refused, a
+  demo position in Marcory is used). Demo friends are placed around Marcory.
+- Web prototype link: the map is drawn in code, because that page cannot load
+  map tiles. Build the web version with `--dart-define=REAL_MAP=true` to get
+  the real map in a browser.
+
+OpenStreetMap's public tile servers are fine for development; a public
+release needs its own tile provider (e.g. MapTiler, Stadia, Thunderforest)
+or Google Maps.
 
 ## Bubble chats: what you can try
 
@@ -43,5 +51,7 @@ flutter run -d chrome  # browser
 - `lib/screens/chat_home.dart` — header, Tales (games) row, bubble area, group sheet
 - `lib/screens/chat_screen.dart` — conversation screen
 - `lib/screens/home_shell.dart` — swipeable pages (Chats, Map) and the dots
-- `lib/screens/map_screen.dart`, `lib/widgets/friend_profile_sheet.dart`, `lib/widgets/city_map.dart` — map
+- `lib/screens/map_screen.dart` — map screen (top bar, friend card, settings)
+- `lib/widgets/map_views.dart` — real map (OpenStreetMap + GPS) and drawn map
+- `lib/widgets/map_markers.dart`, `friend_profile_sheet.dart`, `city_map.dart` — pins, friend card, drawn map
 - `lib/theme.dart` — colors and text styles from Figma (one place to update)

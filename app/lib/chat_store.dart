@@ -2,6 +2,9 @@ import 'dart:math';
 
 import 'package:flutter/material.dart';
 
+import 'package:latlong2/latlong.dart';
+
+import 'geo.dart';
 import 'models.dart';
 
 class FriendSpot {
@@ -20,6 +23,7 @@ class FriendSpot {
   final String updated;
   final int common;
   bool get online => person.online;
+  LatLng get latLng => drawnToLatLng(position);
 }
 
 /// In-memory data for the prototype. Later this becomes a repository that
@@ -119,7 +123,16 @@ class ChatStore extends ChangeNotifier {
 
   /// My position on the map.
   final myPosition = const Offset(700, 1010);
+
+  /// Real GPS position (installed app). Null until the phone shares it.
+  LatLng? myLocation;
   bool ghostMode = false;
+
+  void setMyLocation(LatLng? v) {
+    myLocation = v;
+    notifyListeners();
+  }
+
   bool showOffline = true;
 
   void setGhostMode(bool v) {

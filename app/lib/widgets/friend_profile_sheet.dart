@@ -17,6 +17,7 @@ class FriendProfileSheet extends StatelessWidget {
     required this.onCall,
     required this.onChallenge,
     required this.onRoute,
+    this.miniMap,
   });
 
   final FriendSpot spot;
@@ -27,6 +28,9 @@ class FriendProfileSheet extends StatelessWidget {
   final VoidCallback onCall;
   final VoidCallback onChallenge;
   final VoidCallback onRoute;
+
+  /// Map shown in the address card; defaults to the drawn map.
+  final Widget? miniMap;
 
   @override
   Widget build(BuildContext context) {
@@ -212,9 +216,14 @@ class FriendProfileSheet extends StatelessWidget {
               child: Stack(
                 children: [
                   Positioned.fill(
-                    child: CustomPaint(
-                      painter: CityMapPainter(focus: spot.position, zoom: .75),
-                    ),
+                    child:
+                        miniMap ??
+                        CustomPaint(
+                          painter: CityMapPainter(
+                            focus: spot.position,
+                            zoom: .75,
+                          ),
+                        ),
                   ),
                   Center(child: PersonAvatar(p, diameter: 34, border: 2.5)),
                   Positioned(
