@@ -9,6 +9,7 @@ import '../theme.dart';
 import '../widgets/avatar.dart';
 import '../widgets/friend_profile_sheet.dart';
 import '../widgets/map_views.dart';
+import 'call_screen.dart';
 import 'chat_screen.dart';
 
 /// Real map in the installed app; drawn map in the web prototype link.
@@ -313,9 +314,8 @@ class _MapScreenState extends State<MapScreen> {
               mutuals: mutuals,
               scroll: scroll,
               onMessage: () => _openChat(s.person),
-              onCall: () => _snack(
-                'Calling ${s.person.firstName}… (calls come in the next step)',
-              ),
+              onCall: () =>
+                  CallScreen.open(context, store, store.startCall([s.person])),
               onChallenge: () => _snack(
                 'Challenge ${s.person.firstName} to a game: coming with the games',
               ),

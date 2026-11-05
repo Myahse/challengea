@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import 'package:latlong2/latlong.dart';
 
+import 'call.dart';
 import 'geo.dart';
 import 'models.dart';
 
@@ -123,6 +124,32 @@ class ChatStore extends ChangeNotifier {
 
   /// My position on the map.
   final myPosition = const Offset(700, 1010);
+
+  /// The call in progress, if any (only one at a time).
+  CallSession? call;
+
+  CallSession startCall(
+    List<Person> people, {
+    String? groupName,
+    bool video = false,
+  }) {
+    call?.end();
+    final c = CallSession(
+      people: people,
+      me: me,
+      groupName: groupName,
+      video: video,
+    );
+    c.addListener(() {
+      if (c.ended && identical(call, c)) {
+        call = null;
+        notifyListeners();
+      }
+    });
+    call = c;
+    notifyListeners();
+    return c;
+  }
 
   /// Real GPS position (installed app). Null until the phone shares it.
   LatLng? myLocation;

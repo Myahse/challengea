@@ -10,6 +10,14 @@ Prototype of the **Challengea** screens (MOBILE section of the Figma file
    mini map, Challenge, Route). The filter button has **Ghost mode** and
    "show offline friends". Swipe from the left edge or tap the dots to go back.
 
+4. **Calls** (phone / camera icons in a chat, or the call button on a friend's
+   map card): "Calling…" with pulsing dots, then you in the middle and
+   people around you; `+` spots invite more people (a 1-to-1 call becomes a
+   group call), emoji reactions float up, Camera / Mute / Speaker / guests,
+   and `⌄` minimizes the call behind a green "Tap to return to call" bar.
+   Prototype only: no audio yet. The real app will plug a WebRTC service
+   (e.g. LiveKit) into `lib/call.dart`; the screen stays the same.
+
 **Two maps, same screen:**
 - Installed app (Android / iOS): real **OpenStreetMap** map (`flutter_map`)
   and your real **GPS position** (`geolocator`, asks permission; if refused, a
@@ -54,4 +62,5 @@ flutter run -d chrome  # browser
 - `lib/screens/map_screen.dart` — map screen (top bar, friend card, settings)
 - `lib/widgets/map_views.dart` — real map (OpenStreetMap + GPS) and drawn map
 - `lib/widgets/map_markers.dart`, `friend_profile_sheet.dart`, `city_map.dart` — pins, friend card, drawn map
+- `lib/call.dart`, `lib/screens/call_screen.dart`, `lib/widgets/call_banner.dart` — calls
 - `lib/theme.dart` — colors and text styles from Figma (one place to update)

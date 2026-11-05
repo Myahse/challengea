@@ -4,6 +4,7 @@ import '../chat_store.dart';
 import '../models.dart';
 import '../theme.dart';
 import '../widgets/avatar.dart';
+import 'call_screen.dart';
 
 /// Figma: conversation frame (node 7:21). Works for 1-to-1 and group chats.
 class ChatScreen extends StatefulWidget {
@@ -54,6 +55,15 @@ class _ChatScreenState extends State<ChatScreen> {
       );
   }
 
+  void _startCall({bool video = false}) {
+    final call = widget.store.startCall(
+      node.members,
+      groupName: node.isGroup ? node.displayName : null,
+      video: video,
+    );
+    CallScreen.open(context, widget.store, call);
+  }
+
   String _time(DateTime t) {
     final h = t.hour % 12 == 0 ? 12 : t.hour % 12;
     return '$h:${t.minute.toString().padLeft(2, '0')}${t.hour < 12 ? 'am' : 'pm'}';
@@ -99,11 +109,11 @@ class _ChatScreenState extends State<ChatScreen> {
         ),
         actions: [
           IconButton(
-            onPressed: () => _soon('Video call'),
+            onPressed: () => _startCall(video: true),
             icon: const Icon(Icons.videocam_outlined),
           ),
           IconButton(
-            onPressed: () => _soon('Voice call'),
+            onPressed: () => _startCall(),
             icon: const Icon(Icons.call_outlined),
           ),
           IconButton(onPressed: () {}, icon: const Icon(Icons.more_vert)),

@@ -74,4 +74,31 @@ void main() {
     expect(find.text('20 friends in common'), findsOneWidget);
     expect(find.text('Celine May'), findsOneWidget);
   });
+
+  testWidgets(
+    'a 1-to-1 call connects, becomes a group call when inviting, and ends',
+    (tester) async {
+      final store = ChatStore();
+      final maurice = store.friends.firstWhere((p) => p.name == 'Maurice');
+      final awa = store.friends.firstWhere((p) => p.name == 'Awa');
+      final call = store.startCall([maurice]);
+      expect(call.connected, isFalse);
+      expect(call.title, 'Maurice');
+
+      await tester.pump(const Duration(seconds: 4));
+      expect(call.connected, isTrue);
+      expect(call.joined.length, 1);
+
+      call.invite(awa);
+      expect(call.isGroup, isTrue);
+      expect(call.title, 'Group call');
+      await tester.pump(const Duration(seconds: 5));
+      expect(call.joined.length, 2);
+
+      call.toggleMic();
+      expect(call.micOn, isFalse);
+      call.end();
+      expect(store.call, isNull);
+    },
+  );
 }
