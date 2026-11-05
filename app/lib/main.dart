@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'chat_store.dart';
-import 'screens/chat_home.dart';
+import 'screens/splash.dart';
 import 'theme.dart';
 
 void main() => runApp(NteriApp(store: ChatStore()));
@@ -16,7 +16,7 @@ class NteriApp extends StatelessWidget {
       title: 'nteri',
       debugShowCheckedModeBanner: false,
       theme: buildTheme(),
-      home: ChatHome(store: store),
+      home: SplashScreen(store: store),
     );
   }
 }

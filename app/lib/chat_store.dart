@@ -11,7 +11,14 @@ class ChatStore extends ChangeNotifier {
     _seed();
   }
 
-  final me = const Person('me', 'Moise', Color(0xFFFF8A3D));
+  Person me = const Person('me', 'Moise', Color(0xFFFF8A3D));
+
+  void setMyName(String name) {
+    if (name.trim().isEmpty) return;
+    me = Person('me', name.trim(), me.color);
+    notifyListeners();
+  }
+
   final List<BubbleNode> nodes = [];
   int _groupSeq = 0;
 
