@@ -4,6 +4,24 @@ import 'package:flutter/material.dart';
 
 import 'models.dart';
 
+class FriendSpot {
+  FriendSpot(
+    this.person,
+    this.position, {
+    required this.place,
+    required this.status,
+    required this.updated,
+    required this.common,
+  });
+  final Person person;
+  final Offset position;
+  final String place;
+  final String status;
+  final String updated;
+  final int common;
+  bool get online => person.online;
+}
+
 /// In-memory data for the prototype. Later this becomes a repository that
 /// talks to the Spring Boot / Oracle backend (conversations + members tables).
 class ChatStore extends ChangeNotifier {
@@ -37,6 +55,113 @@ class ChatStore extends ChangeNotifier {
   static const _mom = Person('maman', 'Maman', Color(0xFFE5A93B));
   static const _papa = Person('papa', 'Papa', Color(0xFF7D8CA3));
   static const _sis = Person('aicha', 'Aïcha', Color(0xFFD96C6C));
+  static const _celine = Person('celine', 'Celine May', Color(0xFF9B6B4F));
+
+  /// Friends who share their location (map page). Positions are in map pixels.
+  late final List<FriendSpot> spots = [
+    FriendSpot(
+      _celine,
+      const Offset(560, 760),
+      place: 'Marcory, Abidjan',
+      status: 'On my way to the match',
+      updated: '2 min ago',
+      common: 20,
+    ),
+    FriendSpot(
+      _melanie,
+      const Offset(985, 640),
+      place: 'Remblais, Marcory',
+      status: 'At the market',
+      updated: '5 min ago',
+      common: 12,
+    ),
+    FriendSpot(
+      _marc,
+      const Offset(420, 1210),
+      place: 'Koumassi',
+      status: 'Playing Sudoku',
+      updated: 'just now',
+      common: 8,
+    ),
+    FriendSpot(
+      _brendon,
+      const Offset(905, 1250),
+      place: 'Avenue des Métiers',
+      status: 'Story time',
+      updated: '10 min ago',
+      common: 15,
+    ),
+    FriendSpot(
+      _maurice,
+      const Offset(770, 1490),
+      place: 'Grand Carrefour, Koumassi',
+      status: 'Free tonight?',
+      updated: '1 h ago',
+      common: 5,
+    ),
+    FriendSpot(
+      _awa,
+      const Offset(1060, 985),
+      place: 'Marcory Zone 4',
+      status: 'Coffee break',
+      updated: '20 min ago',
+      common: 9,
+    ),
+    FriendSpot(
+      _clena,
+      const Offset(300, 870),
+      place: 'Treichville',
+      status: 'Offline',
+      updated: '3 h ago',
+      common: 3,
+    ),
+  ];
+
+  /// My position on the map.
+  final myPosition = const Offset(700, 1010);
+  bool ghostMode = false;
+  bool showOffline = true;
+
+  void setGhostMode(bool v) {
+    ghostMode = v;
+    notifyListeners();
+  }
+
+  void setShowOffline(bool v) {
+    showOffline = v;
+    notifyListeners();
+  }
+
+  /// The 1-to-1 chat bubble for [p]; created (and shown on the chat home) if missing.
+  BubbleNode nodeFor(Person p) {
+    final existing = nodes
+        .where((n) => !n.isGroup && n.members.first == p)
+        .firstOrNull;
+    if (existing != null) return existing;
+    final node = BubbleNode.person(p, home: const Offset(.5, .5), size: 34)
+      ..spawn = 0;
+    nodes.add(node);
+    notifyListeners();
+    return node;
+  }
+
+  /// Friends that have their own bubble (used by "Create group").
+  List<Person> get friends => [
+    for (final n in nodes)
+      if (!n.isGroup) n.members.first,
+  ];
+
+  BubbleNode createGroup(List<Person> members, {String? name}) {
+    final group = BubbleNode.group(
+      id: 'g_${_groupSeq++}',
+      members: [...members],
+      home: const Offset(.5, .45),
+      name: name,
+    )..spawn = 0;
+    nodes.add(group);
+    notifyListeners();
+    return group;
+  }
 
   void _seed() {
     final t = DateTime.now();

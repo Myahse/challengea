@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'chat_store.dart';
-import 'screens/chat_home.dart';
+import 'screens/home_shell.dart';
 import 'theme.dart';
 
 void main() => runApp(ChallengeaApp(store: ChatStore()));
@@ -16,7 +16,7 @@ class ChallengeaApp extends StatelessWidget {
       title: 'Challengea',
       debugShowCheckedModeBanner: false,
       theme: buildTheme(),
-      home: ChatHome(store: store),
+      home: HomeShell(store: store),
     );
   }
 }

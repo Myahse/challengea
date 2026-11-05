@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 
 import '../chat_store.dart';
@@ -9,8 +11,9 @@ import 'chat_screen.dart';
 
 /// Figma: "Chat page" (node 28:144).
 class ChatHome extends StatefulWidget {
-  const ChatHome({super.key, required this.store});
+  const ChatHome({super.key, required this.store, this.onOpenMap});
   final ChatStore store;
+  final VoidCallback? onOpenMap;
 
   @override
   State<ChatHome> createState() => _ChatHomeState();
@@ -170,6 +173,80 @@ class _ChatHomeState extends State<ChatHome> {
     );
   }
 
+  /// Alternative to dragging bubbles: pick friends from a list.
+  void _newGroup() {
+    final picked = <Person>{};
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      backgroundColor: Colors.white,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSheet) => SafeArea(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxHeight: MediaQuery.sizeOf(ctx).height * .7,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text('New group', style: tx(18, weight: FontWeight.w700)),
+                Text(
+                  'Tip: you can also drag a bubble onto another',
+                  style: tx(12, color: AppColors.muted),
+                ),
+                const SizedBox(height: 8),
+                Flexible(
+                  child: ListView(
+                    shrinkWrap: true,
+                    children: [
+                      for (final p in store.friends)
+                        CheckboxListTile(
+                          value: picked.contains(p),
+                          onChanged: (v) => setSheet(
+                            () => v == true ? picked.add(p) : picked.remove(p),
+                          ),
+                          secondary: PersonAvatar(p, diameter: 36),
+                          title: Text(
+                            p.name,
+                            style: tx(15, weight: FontWeight.w500),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+                  child: SizedBox(
+                    width: double.infinity,
+                    height: 48,
+                    child: FilledButton(
+                      style: FilledButton.styleFrom(
+                        backgroundColor: AppColors.ink,
+                      ),
+                      onPressed: picked.length < 2
+                          ? null
+                          : () {
+                              Navigator.pop(ctx);
+                              final g = store.createGroup(picked.toList());
+                              _onMerged(g, true, g, g);
+                            },
+                      child: Text(
+                        picked.length < 2
+                            ? 'Pick at least 2 friends'
+                            : 'Create group (${picked.length})',
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -215,39 +292,24 @@ class _ChatHomeState extends State<ChatHome> {
                     ),
                   ),
                   Positioned(
-                    right: 28,
-                    bottom: 46,
-                    child: Material(
-                      color: AppColors.bubble,
-                      shape: const CircleBorder(),
-                      child: InkWell(
-                        customBorder: const CircleBorder(),
-                        onTap: () {
-                          final n = store.addFriend();
-                          if (n == null) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text(
-                                  'No more demo friends',
-                                  style: tx(14, color: Colors.white),
-                                ),
+                    right: 20,
+                    bottom: 40,
+                    child: _SpeedDial(
+                      onMap: widget.onOpenMap,
+                      onAddFriend: () {
+                        if (store.addFriend() == null) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                'No more demo friends',
+                                style: tx(14, color: Colors.white),
                               ),
-                            );
-                          }
-                        },
-                        child: const SizedBox(
-                          width: 50,
-                          height: 50,
-                          child: Icon(Icons.add, size: 32),
-                        ),
-                      ),
+                            ),
+                          );
+                        }
+                      },
+                      onNewGroup: _newGroup,
                     ),
-                  ),
-                  const Positioned(
-                    left: 0,
-                    right: 0,
-                    bottom: 18,
-                    child: _PageDots(),
                   ),
                 ],
               ),
@@ -414,25 +476,118 @@ class _TalesRow extends StatelessWidget {
   }
 }
 
-class _PageDots extends StatelessWidget {
-  const _PageDots();
+/// The "+" button: opens three small actions in an arc (Figma frame 20:55).
+class _SpeedDial extends StatefulWidget {
+  const _SpeedDial({
+    required this.onMap,
+    required this.onAddFriend,
+    required this.onNewGroup,
+  });
+  final VoidCallback? onMap;
+  final VoidCallback onAddFriend;
+  final VoidCallback onNewGroup;
+
+  @override
+  State<_SpeedDial> createState() => _SpeedDialState();
+}
+
+class _SpeedDialState extends State<_SpeedDial>
+    with SingleTickerProviderStateMixin {
+  late final _anim = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 260),
+  );
+  bool get _open =>
+      _anim.status == AnimationStatus.forward ||
+      _anim.status == AnimationStatus.completed;
+
+  @override
+  void dispose() {
+    _anim.dispose();
+    super.dispose();
+  }
+
+  void _toggle() => _open ? _anim.reverse() : _anim.forward();
+
+  void _run(VoidCallback? action) {
+    _anim.reverse();
+    action?.call();
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        for (var i = 0; i < 4; i++)
-          Container(
-            margin: const EdgeInsets.symmetric(horizontal: 2),
-            width: 8,
-            height: 8,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: i == 0 ? AppColors.muted : AppColors.bubble,
-            ),
-          ),
-      ],
+    final actions = [
+      (Icons.map_rounded, 'Map', widget.onMap, 0.0),
+      (Icons.group_add_rounded, 'New group', widget.onNewGroup, pi / 4),
+      (
+        Icons.person_add_alt_1_rounded,
+        'Add friend',
+        widget.onAddFriend,
+        pi / 2,
+      ),
+    ];
+    return SizedBox(
+      width: 140,
+      height: 140,
+      child: AnimatedBuilder(
+        animation: _anim,
+        builder: (context, _) {
+          final t = Curves.easeOutBack.transform(_anim.value);
+          return Stack(
+            clipBehavior: Clip.none,
+            children: [
+              // Actions fan out up and to the left of the "+" button.
+              for (final (icon, label, action, angle) in actions)
+                Positioned(
+                  right: 3 + 80 * t * sin(angle),
+                  bottom: 3 + 80 * t * cos(angle),
+                  child: IgnorePointer(
+                    ignoring: _anim.value < .5,
+                    child: Opacity(
+                      opacity: _anim.value.clamp(0.0, 1.0),
+                      child: Tooltip(
+                        message: label,
+                        child: Material(
+                          color: AppColors.bubble,
+                          shape: const CircleBorder(),
+                          child: InkWell(
+                            customBorder: const CircleBorder(),
+                            onTap: () => _run(action),
+                            child: SizedBox(
+                              width: 44,
+                              height: 44,
+                              child: Icon(icon, size: 22),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              Positioned(
+                right: 0,
+                bottom: 0,
+                child: Material(
+                  color: AppColors.bubble,
+                  shape: const CircleBorder(),
+                  child: InkWell(
+                    customBorder: const CircleBorder(),
+                    onTap: _toggle,
+                    child: SizedBox(
+                      width: 50,
+                      height: 50,
+                      child: Transform.rotate(
+                        angle: _anim.value * pi / 4,
+                        child: const Icon(Icons.add, size: 32),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          );
+        },
+      ),
     );
   }
 }

@@ -1,5 +1,6 @@
 import 'dart:math';
 
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
@@ -239,23 +240,45 @@ class _BubbleFieldState extends State<BubbleField>
     return LayoutBuilder(
       builder: (context, c) {
         _size = c.biggest;
-        return GestureDetector(
+        return RawGestureDetector(
           behavior: HitTestBehavior.opaque,
-          onTapUp: (d) {
-            final n = _hit(d.localPosition);
-            if (n != null) widget.onOpen(n);
+          gestures: {
+            TapGestureRecognizer:
+                GestureRecognizerFactoryWithHandlers<TapGestureRecognizer>(
+                  () => TapGestureRecognizer(debugOwner: this),
+                  (r) => r.onTapUp = (d) {
+                    final n = _hit(d.localPosition);
+                    if (n != null) widget.onOpen(n);
+                  },
+                ),
+            LongPressGestureRecognizer:
+                GestureRecognizerFactoryWithHandlers<
+                  LongPressGestureRecognizer
+                >(
+                  () => LongPressGestureRecognizer(debugOwner: this),
+                  (r) => r.onLongPressStart = (d) {
+                    final n = _hit(d.localPosition);
+                    if (n != null) {
+                      HapticFeedback.heavyImpact();
+                      widget.onLongPress(n);
+                    }
+                  },
+                ),
+            // Only claims drags that start ON a bubble, so swiping on empty
+            // space still changes page (chats <-> map).
+            _BubblePanRecognizer:
+                GestureRecognizerFactoryWithHandlers<_BubblePanRecognizer>(
+                  () => _BubblePanRecognizer(
+                    isOnBubble: (p) => _hit(p) != null,
+                    debugOwner: this,
+                  ),
+                  (r) => r
+                    ..onStart = _onPanStart
+                    ..onUpdate = _onPanUpdate
+                    ..onEnd = _onPanEnd
+                    ..onCancel = _onPanEnd,
+                ),
           },
-          onLongPressStart: (d) {
-            final n = _hit(d.localPosition);
-            if (n != null) {
-              HapticFeedback.heavyImpact();
-              widget.onLongPress(n);
-            }
-          },
-          onPanStart: _onPanStart,
-          onPanUpdate: _onPanUpdate,
-          onPanEnd: _onPanEnd,
-          onPanCancel: _onPanEnd,
           child: Stack(
             clipBehavior: Clip.none,
             children: [
@@ -437,4 +460,13 @@ class _BubbleFieldState extends State<BubbleField>
       ),
     );
   }
+}
+
+class _BubblePanRecognizer extends PanGestureRecognizer {
+  _BubblePanRecognizer({required this.isOnBubble, super.debugOwner});
+  final bool Function(Offset localPosition) isOnBubble;
+
+  @override
+  bool isPointerAllowed(PointerEvent event) =>
+      isOnBubble(event.localPosition) && super.isPointerAllowed(event);
 }
