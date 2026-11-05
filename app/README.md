@@ -4,7 +4,7 @@ Prototype of the **Challengea** screens (MOBILE section of the Figma file
 "Challengea - N'TERI"; the NTERI part of that file is a separate project).
 
 1. **Chat home** — the bubble chats described below; `+` opens Map / New group / Add friend
-2. **Conversation** — 1-to-1 and group chat
+2. **Conversation** — 1-to-1 and group chat (tap the name for the profile)
 3. **Friends map** (swipe left from Chats, or the dots) — works like Snap Map:
    tap a friend to fly to them and open their card (call, message, status,
    mini map, Challenge, Route). The filter button has **Ghost mode** and
@@ -17,6 +17,20 @@ Prototype of the **Challengea** screens (MOBILE section of the Figma file
    and `⌄` minimizes the call behind a green "Tap to return to call" bar.
    Prototype only: no audio yet. The real app will plug a WebRTC service
    (e.g. LiveKit) into `lib/call.dart`; the screen stays the same.
+
+5. **Videos** (3rd dot): full-screen vertical feed. Swipe up for the next
+   video, double-tap to like, tap to pause, tap the caption to expand it.
+   Like / comments / share / save / repost on the side, Follow, music disc.
+   **Comments** sheet (likes, replies, "See translation", image comments).
+   **Live** videos show product cards; tap one for the **product sheet**
+   (sizes + Buy).
+6. **Profile** (4th dot = mine; tap an avatar in a video, on the map card or
+   in a chat header for someone else's): cover, Follow / Edit profile,
+   followers / following / likes, Message, bio, sticky tabs
+   posts / Videos / Stories / tags and the grid (tap to watch).
+
+Videos and photos are animated colour placeholders until the backend stores
+real media (then `video_player` / cached images replace `FakeVideo`).
 
 **Two maps, same screen:**
 - Installed app (Android / iOS): real **OpenStreetMap** map (`flutter_map`)
@@ -63,4 +77,5 @@ flutter run -d chrome  # browser
 - `lib/widgets/map_views.dart` — real map (OpenStreetMap + GPS) and drawn map
 - `lib/widgets/map_markers.dart`, `friend_profile_sheet.dart`, `city_map.dart` — pins, friend card, drawn map
 - `lib/call.dart`, `lib/screens/call_screen.dart`, `lib/widgets/call_banner.dart` — calls
+- `lib/feed.dart`, `lib/screens/video_feed.dart`, `lib/screens/profile_screen.dart`, `lib/widgets/comments_sheet.dart`, `product_sheet.dart`, `fake_video.dart` — videos, profiles, shop
 - `lib/theme.dart` — colors and text styles from Figma (one place to update)

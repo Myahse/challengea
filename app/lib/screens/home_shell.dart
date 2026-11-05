@@ -4,10 +4,12 @@ import '../chat_store.dart';
 import '../theme.dart';
 import 'chat_home.dart';
 import 'map_screen.dart';
+import 'profile_screen.dart';
+import 'video_feed.dart';
 
-/// Swipeable pages with the dots from Figma: Chats, then the map.
-/// On the map, one-finger drags move the map, so going back to Chats is done
-/// with the dots or by swiping from the left edge.
+/// Swipeable pages with the 4 dots from Figma: Chats, Map, Videos, Profile.
+/// On the map, drags move the map, so the dots (or the screen edges) change
+/// page there.
 class HomeShell extends StatefulWidget {
   const HomeShell({super.key, required this.store});
   final ChatStore store;
@@ -20,7 +22,7 @@ class _HomeShellState extends State<HomeShell> {
   final _pages = PageController();
   int _page = 0;
 
-  static const _count = 2;
+  static const _map = 1, _videos = 2, _count = 4;
 
   void _go(int page) => _pages.animateToPage(
     page,
@@ -34,40 +36,52 @@ class _HomeShellState extends State<HomeShell> {
     super.dispose();
   }
 
+  Widget _edge({required bool left}) => Positioned(
+    left: left ? 0 : null,
+    right: left ? null : 0,
+    top: 120,
+    bottom: 60,
+    width: 22,
+    child: GestureDetector(
+      behavior: HitTestBehavior.translucent,
+      onHorizontalDragEnd: (d) {
+        final v = d.primaryVelocity ?? 0;
+        if (left && v > 150) _go(_page - 1);
+        if (!left && v < -150) _go(_page + 1);
+      },
+    ),
+  );
+
   @override
   Widget build(BuildContext context) {
     final bottom = MediaQuery.paddingOf(context).bottom;
+    final store = widget.store;
+    final onDark = _page == _videos;
     return Scaffold(
       body: Stack(
         children: [
           PageView(
             controller: _pages,
-            physics: _page == 1
+            physics: _page == _map
                 ? const NeverScrollableScrollPhysics()
                 : const PageScrollPhysics(),
             onPageChanged: (p) => setState(() => _page = p),
             children: [
-              ChatHome(store: widget.store, onOpenMap: () => _go(1)),
-              MapScreen(store: widget.store),
+              ChatHome(store: store, onOpenMap: () => _go(_map)),
+              MapScreen(store: store),
+              VideoFeed(
+                store: store,
+                posts: store.feed.forYou,
+                active: _page == _videos,
+              ),
+              ProfileScreen(store: store, creator: store.feed.me),
             ],
           ),
-          if (_page == 1)
-            Positioned(
-              left: 0,
-              top: 120,
-              bottom: 0,
-              width: 22,
-              child: GestureDetector(
-                behavior: HitTestBehavior.translucent,
-                onHorizontalDragEnd: (d) {
-                  if ((d.primaryVelocity ?? 0) > 150) _go(0);
-                },
-              ),
-            ),
+          if (_page == _map) ...[_edge(left: true), _edge(left: false)],
           Positioned(
             left: 0,
             right: 0,
-            bottom: bottom + 10,
+            bottom: bottom + 8,
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
@@ -84,8 +98,10 @@ class _HomeShellState extends State<HomeShell> {
                         decoration: BoxDecoration(
                           borderRadius: BorderRadius.circular(4),
                           color: i == _page
-                              ? AppColors.ink
-                              : AppColors.muted.withValues(alpha: .4),
+                              ? (onDark ? Colors.white : AppColors.ink)
+                              : (onDark
+                                    ? Colors.white54
+                                    : AppColors.muted.withValues(alpha: .4)),
                         ),
                       ),
                     ),

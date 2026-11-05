@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:latlong2/latlong.dart';
 
 import 'call.dart';
+import 'feed.dart';
 import 'geo.dart';
 import 'models.dart';
 
@@ -124,6 +125,12 @@ class ChatStore extends ChangeNotifier {
 
   /// My position on the map.
   final myPosition = const Offset(700, 1010);
+
+  /// Profiles, videos, comments.
+  late final FeedData feed = FeedData(
+    me: me,
+    friends: [_melanie, _marc, _brendon, _clena, _maurice, _awa, _yao, _celine],
+  );
 
   /// The call in progress, if any (only one at a time).
   CallSession? call;

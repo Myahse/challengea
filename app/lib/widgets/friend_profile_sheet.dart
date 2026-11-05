@@ -18,6 +18,7 @@ class FriendProfileSheet extends StatelessWidget {
     required this.onChallenge,
     required this.onRoute,
     this.miniMap,
+    this.onOpenProfile,
   });
 
   final FriendSpot spot;
@@ -31,6 +32,9 @@ class FriendProfileSheet extends StatelessWidget {
 
   /// Map shown in the address card; defaults to the drawn map.
   final Widget? miniMap;
+
+  /// Opens the full profile (tap on the photo or the name).
+  final VoidCallback? onOpenProfile;
 
   @override
   Widget build(BuildContext context) {
@@ -83,7 +87,10 @@ class FriendProfileSheet extends StatelessWidget {
                   shape: BoxShape.circle,
                   color: AppColors.bubble,
                 ),
-                child: PersonAvatar(p, diameter: 96),
+                child: GestureDetector(
+                  onTap: onOpenProfile,
+                  child: PersonAvatar(p, diameter: 96),
+                ),
               ),
             ),
           ),
@@ -106,10 +113,13 @@ class FriendProfileSheet extends StatelessWidget {
               ),
             ],
           ),
-          Text(
-            p.name,
-            textAlign: TextAlign.center,
-            style: tx(40, weight: FontWeight.w800).copyWith(height: 1.05),
+          GestureDetector(
+            onTap: onOpenProfile,
+            child: Text(
+              p.name,
+              textAlign: TextAlign.center,
+              style: tx(40, weight: FontWeight.w800).copyWith(height: 1.05),
+            ),
           ),
           const SizedBox(height: 10),
           Center(

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:challengea/main.dart';
 import 'package:challengea/screens/chat_home.dart';
 import 'package:challengea/screens/map_screen.dart';
+import 'package:challengea/screens/profile_screen.dart';
 
 void main() {
   testWidgets('chat home shows the bubble field', (tester) async {
@@ -101,4 +102,49 @@ void main() {
       expect(store.call, isNull);
     },
   );
+
+  test('feed: like, follow, comment and replies update the counts', () {
+    final feed = ChatStore().feed;
+    final post = feed.forYou.first;
+    final likes = post.likes;
+    feed.toggleLike(post);
+    expect(post.likes, likes + 1);
+    feed.like(post); // double-tap on an already liked video keeps one like
+    expect(post.likes, likes + 1);
+
+    final bob = post.author;
+    final followers = bob.followers;
+    feed.toggleFollow(bob);
+    expect(bob.followed, isTrue);
+    expect(bob.followers, followers + 1);
+
+    final count = post.commentCount;
+    feed.addComment(post, 'Nice!');
+    expect(post.comments.first.text, 'Nice!');
+    feed.addComment(post, 'Thanks', replyTo: post.comments.first);
+    expect(post.comments.first.replies.single.text, 'Thanks');
+    expect(post.commentCount, count + 2);
+  });
+
+  testWidgets('profile shows the tabs from Figma and opens on my profile', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(430, 932);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final store = ChatStore();
+    final bob = store.feed.forYou.first.author;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: ProfileScreen(store: store, creator: bob),
+      ),
+    );
+    expect(find.text('Bob Reeze'), findsOneWidget);
+    expect(find.text('@Boby_pop'), findsOneWidget);
+    expect(find.text('24 posts'), findsOneWidget);
+    expect(find.text('45 tags'), findsOneWidget);
+    await tester.tap(find.text('Follow'));
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.text('Following'), findsNWidgets(2)); // the button + the "Following" stat tile
+  });
 }

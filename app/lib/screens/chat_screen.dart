@@ -5,6 +5,7 @@ import '../models.dart';
 import '../theme.dart';
 import '../widgets/avatar.dart';
 import 'call_screen.dart';
+import 'profile_screen.dart';
 
 /// Figma: conversation frame (node 7:21). Works for 1-to-1 and group chats.
 class ChatScreen extends StatefulWidget {
@@ -77,34 +78,45 @@ class _ChatScreenState extends State<ChatScreen> {
         backgroundColor: Colors.white,
         surfaceTintColor: Colors.white,
         titleSpacing: 0,
-        title: ListenableBuilder(
-          listenable: widget.store,
-          builder: (context, _) => Row(
-            children: [
-              node.isGroup
-                  ? GroupAvatar(node.members, diameter: 38)
-                  : PersonAvatar(node.members.first, diameter: 36),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      node.displayName,
-                      style: tx(16, weight: FontWeight.w700),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    Text(
-                      node.isGroup
-                          ? '${node.members.length} members · ${node.members.map((m) => m.firstName).join(', ')}'
-                          : (node.members.first.online ? 'online' : 'offline'),
-                      style: tx(11, color: AppColors.muted),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
+        title: GestureDetector(
+          onTap: node.isGroup
+              ? null
+              : () => ProfileScreen.open(
+                  context,
+                  widget.store,
+                  widget.store.feed.creatorFor(node.members.first),
                 ),
-              ),
-            ],
+          child: ListenableBuilder(
+            listenable: widget.store,
+            builder: (context, _) => Row(
+              children: [
+                node.isGroup
+                    ? GroupAvatar(node.members, diameter: 38)
+                    : PersonAvatar(node.members.first, diameter: 36),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        node.displayName,
+                        style: tx(16, weight: FontWeight.w700),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      Text(
+                        node.isGroup
+                            ? '${node.members.length} members · ${node.members.map((m) => m.firstName).join(', ')}'
+                            : (node.members.first.online
+                                  ? 'online'
+                                  : 'offline'),
+                        style: tx(11, color: AppColors.muted),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
         actions: [

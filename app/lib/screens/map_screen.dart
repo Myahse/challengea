@@ -10,6 +10,7 @@ import '../widgets/avatar.dart';
 import '../widgets/friend_profile_sheet.dart';
 import '../widgets/map_views.dart';
 import 'call_screen.dart';
+import 'profile_screen.dart';
 import 'chat_screen.dart';
 
 /// Real map in the installed app; drawn map in the web prototype link.
@@ -320,6 +321,11 @@ class _MapScreenState extends State<MapScreen> {
                 'Challenge ${s.person.firstName} to a game: coming with the games',
               ),
               onRoute: () => _showRoute(s),
+              onOpenProfile: () => ProfileScreen.open(
+                context,
+                store,
+                store.feed.creatorFor(s.person),
+              ),
               miniMap: widget.useRealMap
                   ? RealMiniMap(key: ValueKey(s.person.id), center: s.latLng)
                   : null,
