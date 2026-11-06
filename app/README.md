@@ -4,7 +4,7 @@ Prototype of the **Challengea** screens (MOBILE section of the Figma file
 "Challengea - N'TERI"; the NTERI part of that file is a separate project).
 
 1. **Chat home** — the bubble chats described below; `+` opens Map / New group / Add friend
-2. **Conversation** — 1-to-1 and group chat (tap the name for the profile)
+2. **Conversation** — 1-to-1 and group chat (tap the name for the profile): text, **photos** (gallery or camera, tap to zoom), **voice notes** (hold the mic, slide left to cancel) and **stickers**
 3. **Friends map** (swipe left from Chats, or the dots) — works like Snap Map:
    tap a friend to fly to them and open their card (call, message, status,
    mini map, Challenge, Route). The filter button has **Ghost mode** and

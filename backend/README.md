@@ -92,8 +92,10 @@ All four return `{token, user, isNew}`.
 | DELETE | `/api/conversations/{id}/members/{userId}` | Leave, or remove someone (owner only). A group left with 1 person is deleted |
 | PATCH | `/api/conversations/{id}` | `{title}` |
 | GET | `/api/conversations/{id}/messages?before=&limit=` | Newest first, page with `before` = oldest id you have |
-| POST | `/api/conversations/{id}/messages` | `{type, body?, mediaUrl?, metadata?}`; types `text`, `voice`, `image`, `file`, `sticker` |
+| POST | `/api/conversations/{id}/messages` | `{type, body?, mediaUrl?, metadata?}`; types `text`, `sticker` (body = the sticker), `image` and `voice` (upload first; voice metadata: `durationMs`, `waveform`) |
 | POST | `/api/conversations/{id}/read` | `{messageId}` |
+| POST | `/api/media` | multipart `file` + `kind` (`image` ≤ 10 MB, `voice` ≤ 5 MB) → `{id, url}` to put in a message's `mediaUrl` |
+| GET | `/api/media/{id}` | The file (no token: the random id is the secret) |
 | PUT | `/api/bubbles` | `{items: [{conversationId, x, y}]}` (0..1) |
 
 ### Map
@@ -133,8 +135,9 @@ in the CONNECT frame, subscribe to `/user/queue/events`. Each event is
 
 - **SMS sending**: plug a provider (Orange / MTN SMS API, Twilio…) in
   `AuthService.requestCode`, then set `OTP_DEV_ECHO=false`.
-- **Media** (voice notes, photos, videos): upload to object storage (S3 /
-  MinIO) with pre-signed URLs; messages already have `mediaUrl` + `metadata`.
+- **Media storage at scale**: photos and voice notes are stored in Oracle
+  (BLOB) for now; move them to object storage (OCI Object Storage / S3) when
+  usage grows. Videos are not supported yet.
 - **Calls**: a LiveKit (WebRTC) server; the API will issue room tokens.
 - **Videos, comments, shop and payments** (CinetPay / Wave / mobile money).
 - **Push notifications** (FCM) when the app is closed.

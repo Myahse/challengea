@@ -166,8 +166,8 @@ class OnlineSync {
     final isChallenge = type == 'system' && meta?['kind'] == 'challenge';
     var body = (m['body'] as String?) ?? (type == 'sticker' ? '🙂' : '[$type]');
     if (isChallenge && senderId == myId && gameId != null) {
-      body =
-          'You sent a ${gameById(gameId).name} challenge'; // the server text is written for the friend
+      // The server text is written for the friend.
+      body = 'You sent a challenge: ${gameById(gameId).name}';
     }
     final url = m['mediaUrl'] as String?;
     final kind = switch (type) {
