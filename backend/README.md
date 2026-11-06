@@ -38,6 +38,8 @@ Check: `curl http://localhost:8080/actuator/health` → `{"status":"UP"}`.
 | `JWT_SECRET` | dev value | **Set a long random secret in production** |
 | `JWT_TTL` | `30d` | How long a sign-in lasts |
 | `OTP_DEV_ECHO` | `true` | Returns the SMS code in the API response. **Set to `false` once an SMS provider is connected** |
+| `FIREBASE_CREDENTIALS` | empty | Path to the Firebase service-account JSON (push notifications) |
+| `LIVEKIT_URL` / `LIVEKIT_API_KEY` / `LIVEKIT_API_SECRET` | dev values | Call server (see Calls) |
 
 ## Tests
 
@@ -138,6 +140,18 @@ When a call ends, the chat gets "📞 Voice call · 3:12" or "📵 Missed call".
 LiveKit settings: `LIVEKIT_URL` (what phones connect to, e.g.
 `ws://192.168.1.20:7880`), `LIVEKIT_API_KEY`, `LIVEKIT_API_SECRET` (32+ chars).
 
+### Push notifications
+
+People who don't have the app open (no WebSocket) get a Firebase Cloud
+Messaging notification for: new messages, challenges, incoming calls and
+friend requests. Without `FIREBASE_CREDENTIALS` (path to a Firebase
+service-account JSON) notifications are only written to the log.
+
+| Method | Path | |
+|---|---|---|
+| PUT | `/api/devices` | `{token, platform}`: register this phone's FCM token |
+| POST | `/api/devices/unregister` | `{token, platform}`: on sign-out |
+
 ### Real-time events
 
 Connect with STOMP to `ws://host:8080/ws`, send `Authorization: Bearer <token>`
@@ -160,4 +174,3 @@ in the CONNECT frame, subscribe to `/user/queue/events`. Each event is
   instance); use LiveKit webhooks when running several instances. Production
   LiveKit needs a public IP / TURN server for phones on mobile networks.
 - **Videos, comments, shop and payments** (CinetPay / Wave / mobile money).
-- **Push notifications** (FCM) when the app is closed.

@@ -12,6 +12,7 @@ import '../geo.dart';
 import '../models.dart';
 import 'api_client.dart';
 import 'live_call.dart';
+import 'push.dart';
 import 'realtime.dart';
 import 'session_store.dart';
 
@@ -67,6 +68,23 @@ class OnlineSync {
   /// Set by the UI: a friend challenged me / something to tell the user.
   void Function(OnlineMatch match)? onInvite;
 
+  /// Set by the UI: open this chat (after tapping a notification).
+  void Function(BubbleNode node)? onOpenChat;
+  Map<String, dynamic>? _pendingOpen;
+
+  /// A notification was tapped: show what it is about.
+  void openFromNotification(Map<String, dynamic> data) {
+    // Other kinds: the app simply opens on the home screen.
+    if (data['type'] != 'message.new') return;
+    final id = int.tryParse('${data['conversationId']}');
+    final node = store.nodes.where((n) => n.serverId == id).firstOrNull;
+    if (node != null && onOpenChat != null) {
+      onOpenChat!(node);
+    } else {
+      _pendingOpen = data; // conversations not loaded yet
+    }
+  }
+
   /// Set by the UI: someone is calling me.
   void Function(IncomingCall call)? onIncomingCall;
   void Function(String text)? onNotice;
@@ -118,6 +136,7 @@ class OnlineSync {
     store.goOnline(sync, me);
     store.feed.me.bio = (meDto['bio'] as String?) ?? '';
     await sync.refreshAll();
+    unawaited(PushService.start(sync));
     sync._realtime = Realtime(
       api.baseUrl,
       api.token!,
@@ -131,6 +150,7 @@ class OnlineSync {
   }
 
   Future<void> signOut() async {
+    await PushService.stop(this);
     close();
     await SessionStore.save(null);
   }
@@ -317,6 +337,11 @@ class OnlineSync {
       } else {
         fresh.add(_nodeFrom(dto, i)..spawn = 0);
       }
+    }
+    if (_pendingOpen != null) {
+      final pending = _pendingOpen!;
+      _pendingOpen = null;
+      Future.microtask(() => openFromNotification(pending));
     }
     // Keep bubbles being created right now and friends without a chat yet.
     final directIds = {

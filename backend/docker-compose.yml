@@ -45,6 +45,10 @@ services:
       LIVEKIT_URL: ws://localhost:7880   # use your computer's Wi-Fi address for real phones
       LIVEKIT_API_KEY: devkey
       LIVEKIT_API_SECRET: challengea-livekit-dev-secret-change-me
+      # Push notifications: put your Firebase key next to this file and uncomment.
+      # FIREBASE_CREDENTIALS: /run/secrets/firebase.json
+    # volumes:
+    #   - ./firebase.json:/run/secrets/firebase.json:ro
     ports:
       - "8080:8080"
 

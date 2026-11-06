@@ -58,6 +58,28 @@ OpenStreetMap's public tile servers are fine for development; a public
 release needs its own tile provider (e.g. MapTiler, Stadia, Thunderforest)
 or Google Maps.
 
+## Push notifications
+
+New messages, challenges, calls and friend requests reach the phone when the
+app is closed (the server only notifies people who don't have the app open).
+Until Firebase is set up, the app simply runs without them.
+
+1. Create a project at <https://console.firebase.google.com> and add an
+   Android app (`com.challengea.challengea`) and an iOS app.
+2. In this folder:
+   ```bash
+   dart pub global activate flutterfire_cli
+   flutterfire configure
+   ```
+   This replaces `lib/firebase_options.dart` and adds the Firebase files.
+3. iOS only: in Xcode enable *Push Notifications* and *Background Modes →
+   Remote notifications*, and upload an APNs key in the Firebase console.
+4. Backend: Firebase console → Project settings → Service accounts →
+   *Generate new private key*, then start the API with
+   `FIREBASE_CREDENTIALS=/path/to/key.json`.
+
+Tapping a message notification opens that chat.
+
 ## Bubble chats: what you can try
 
 | Gesture | Result |

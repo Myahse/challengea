@@ -39,6 +39,9 @@ app:
     url: ${LIVEKIT_URL:ws://localhost:7880}
     api-key: ${LIVEKIT_API_KEY:devkey}
     api-secret: ${LIVEKIT_API_SECRET:challengea-livekit-dev-secret-change-me}
+  push:
+    # Path to the Firebase service-account JSON. Empty = notifications are only logged.
+    firebase-credentials: ${FIREBASE_CREDENTIALS:}
   otp:
     ttl: 5m
     # Dev only: return the SMS code in the API response (no SMS provider yet).

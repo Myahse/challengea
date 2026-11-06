@@ -281,6 +281,43 @@ class ApiIntegrationTest {
     return events;
   }
 
+  @org.springframework.beans.factory.annotation.Autowired
+  TestDatabase.RecordingPush push;
+
+  @Test
+  void offlineFriendsGetPushNotificationsOnlineOnesDont() throws Exception {
+    var me = signUp("Moise");
+    var friend = signUp("Marc");
+    befriend(me, friend);
+    http.put().uri("/devices").header("Authorization", "Bearer " + friend.token())
+        .body(Map.of("token", "marc-phone-" + friend.id(), "platform", "android")).retrieve().toBodilessEntity();
+    var chat = post("/conversations/direct/" + friend.id(), null, me.token());
+    push.sent.clear();
+
+    // Marc's app is closed: he gets a notification.
+    post("/conversations/" + chat.get("id") + "/messages", Map.of("type", "text", "body", "Salut !"), me.token());
+    var note = push.sent.poll(5, TimeUnit.SECONDS);
+    assertThat(note).isEqualTo("marc-phone-" + friend.id() + "|Moise|Salut !|message.new");
+
+    // A challenge and a call are notified too.
+    post("/matches", Map.of("gameId", "arcade", "opponentId", friend.id()), me.token());
+    assertThat(drainUntil("match.invited")).contains("Moise challenges you");
+
+    // Marc opens the app (WebSocket connected): no more notifications for messages.
+    listen(friend);
+    push.sent.clear();
+    post("/conversations/" + chat.get("id") + "/messages", Map.of("type", "text", "body", "Tu es là ?"), me.token());
+    assertThat(push.sent.poll(1500, TimeUnit.MILLISECONDS)).isNull();
+  }
+
+  private String drainUntil(String type) throws InterruptedException {
+    while (true) {
+      var n = push.sent.poll(5, TimeUnit.SECONDS);
+      assertThat(n).as("push " + type).isNotNull();
+      if (n.endsWith("|" + type)) return n;
+    }
+  }
+
   @Test
   void ghostModeHidesMeFromTheMap() {
     var me = signUp("Me");

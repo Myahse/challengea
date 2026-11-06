@@ -13,6 +13,23 @@ import org.testcontainers.oracle.OracleContainer;
  */
 @TestConfiguration(proxyBeanMethods = false)
 class TestDatabase {
+  /** Records notifications instead of sending them to Firebase. */
+  @Bean
+  @org.springframework.context.annotation.Primary
+  RecordingPush recordingPush() {
+    return new RecordingPush();
+  }
+
+  public static class RecordingPush implements com.challengea.api.push.PushSender {
+    public final java.util.concurrent.BlockingQueue<String> sent = new java.util.concurrent.LinkedBlockingQueue<>();
+
+    @Override
+    public boolean send(String token, String title, String body, java.util.Map<String, String> data, boolean urgent) {
+      sent.add(token + "|" + title + "|" + body + "|" + data.get("type"));
+      return true;
+    }
+  }
+
   @Bean
   @ServiceConnection
   @ConditionalOnProperty(name = "tests.db.external", havingValue = "false", matchIfMissing = true)

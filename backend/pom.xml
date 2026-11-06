@@ -82,6 +82,13 @@
       <scope>runtime</scope>
     </dependency>
 
+    <!-- Push notifications (Firebase Cloud Messaging) -->
+    <dependency>
+      <groupId>com.google.firebase</groupId>
+      <artifactId>firebase-admin</artifactId>
+      <version>9.11.0</version>
+    </dependency>
+
     <!-- Tests run against a real Oracle 23ai (Testcontainers or an existing DB) -->
     <dependency>
       <groupId>org.springframework.boot</groupId>
