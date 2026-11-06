@@ -85,7 +85,7 @@ Widget messageImage(Message m, {BoxFit fit = BoxFit.cover}) {
         duration: Motion.normal,
         child: child,
       ),
-      errorBuilder: (_, _, _) => const Center(
+      errorBuilder: (_, _, _) => Center(
         child: Icon(Icons.broken_image_outlined, color: AppColors.muted),
       ),
     );
@@ -248,7 +248,7 @@ class VoiceBubble extends StatelessWidget {
                     height: 40,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: mine ? AppColors.accent : AppColors.ink,
+                      color: mine ? AppColors.onSent : AppColors.ink,
                     ),
                     child: AnimatedSwitcher(
                       duration: Motion.fast,
@@ -259,7 +259,7 @@ class VoiceBubble extends StatelessWidget {
                             ? Icons.pause_rounded
                             : Icons.play_arrow_rounded,
                         key: ValueKey(playing),
-                        color: Colors.white,
+                        color: mine ? AppColors.accent : Colors.white,
                       ),
                     ),
                   ),
@@ -272,7 +272,7 @@ class VoiceBubble extends StatelessWidget {
                     painter: _WavePainter(
                       bars,
                       p,
-                      mine ? AppColors.accent : AppColors.ink,
+                      mine ? AppColors.onSent : AppColors.ink,
                     ),
                   ),
                 ),
@@ -282,7 +282,7 @@ class VoiceBubble extends StatelessWidget {
                   style: tx(
                     12,
                     weight: FontWeight.w600,
-                    color: AppColors.muted,
+                    color: mine ? AppColors.onSent : AppColors.muted,
                   ),
                 ),
               ],

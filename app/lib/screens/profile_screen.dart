@@ -2,13 +2,16 @@ import 'package:flutter/material.dart';
 
 import '../chat_store.dart';
 import '../feed.dart';
+import '../games/challenge.dart';
 import '../theme.dart';
+import '../widgets/avatar.dart';
 import '../widgets/fake_video.dart';
+import '../widgets/glass.dart';
 import '../widgets/motion.dart';
 import 'chat_screen.dart';
 import 'video_feed.dart';
 
-/// Figma: "User profile page" frames 47:178 (top) and 50:526 (scrolled grid).
+/// A person: their bubble, name and numbers, then what they shared.
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({
     super.key,
@@ -98,7 +101,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       context: context,
       isScrollControlled: true,
       showDragHandle: true,
-      backgroundColor: Colors.white,
+      backgroundColor: AppColors.card,
       builder: (ctx) => Padding(
         padding: EdgeInsets.fromLTRB(
           20,
@@ -130,7 +133,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             const SizedBox(height: 10),
             FilledButton(
               style: FilledButton.styleFrom(
-                backgroundColor: AppColors.ink,
+                backgroundColor: AppColors.accent,
                 minimumSize: const Size.fromHeight(50),
               ),
               onPressed: () async {
@@ -156,11 +159,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               },
               child: Text(
                 'Sign out',
-                style: tx(
-                  15,
-                  weight: FontWeight.w600,
-                  color: const Color(0xFFE5484D),
-                ),
+                style: tx(15, weight: FontWeight.w600, color: AppColors.danger),
               ),
             ),
           ],
@@ -182,7 +181,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Widget build(BuildContext context) {
     final top = MediaQuery.paddingOf(context).top;
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: AppColors.page,
       body: ListenableBuilder(
         listenable: feed,
         builder: (context, _) {
@@ -206,9 +205,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   SliverToBoxAdapter(child: SizedBox(key: _gridKey, height: 1)),
                   SliverPadding(
                     padding: EdgeInsets.fromLTRB(
-                      24,
                       12,
-                      24,
+                      8,
+                      12,
                       MediaQuery.paddingOf(context).bottom + 110,
                     ),
                     sliver: shown.isEmpty
@@ -218,7 +217,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               child: Text(
                                 'Nothing here yet',
                                 textAlign: TextAlign.center,
-                                style: tx(14, color: AppColors.muted),
+                                style: tx(17, color: AppColors.muted),
                               ),
                             ),
                           )
@@ -226,9 +225,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             gridDelegate:
                                 const SliverGridDelegateWithFixedCrossAxisCount(
                                   crossAxisCount: 3,
-                                  mainAxisSpacing: 14,
-                                  crossAxisSpacing: 14,
-                                  childAspectRatio: 114 / 88,
+                                  mainAxisSpacing: 8,
+                                  crossAxisSpacing: 8,
                                 ),
                             itemCount: shown.length,
                             // Tiles pop in one after another (first rows only).
@@ -237,7 +235,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               delay: Duration(
                                 milliseconds: 40 * (i < 15 ? i : 15),
                               ),
-                              scale: .9,
+                              scale: .94,
                               child: Pressable(
                                 onTap: () => VideoFeed.open(
                                   context,
@@ -256,10 +254,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 Positioned(
                   left: 12,
                   top: top + 8,
-                  child: Material(
-                    color: Colors.white.withValues(alpha: .85),
-                    shape: const CircleBorder(),
+                  child: Glass(
+                    radius: 24,
                     child: IconButton(
+                      tooltip: 'Back',
                       onPressed: () => Navigator.pop(context),
                       icon: const Icon(
                         Icons.arrow_back_ios_new_rounded,
@@ -276,7 +274,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   List<String> _tabLabels() => [
-    '${c.posts.length} posts',
+    '${c.posts.length} ${c.posts.length == 1 ? 'post' : 'posts'}',
     '${c.count(PostKind.video)} Videos',
     '${c.count(PostKind.story)} Stories',
     '${c.tagged} tags',
@@ -284,125 +282,141 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Widget _header() {
     final p = c.person;
-    return Stack(
-      children: [
-        // Cover: placeholder for the profile photo.
-        Container(
-          height: 470,
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [Color.lerp(p.color, Colors.white, .7)!, p.color],
+    final top = MediaQuery.paddingOf(context).top;
+    return Padding(
+      padding: EdgeInsets.fromLTRB(12, top + 24, 12, 12),
+      child: Column(
+        children: [
+          Floaty(
+            distance: 8,
+            seconds: 6,
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: p.color.withValues(alpha: .3),
+                    blurRadius: 40,
+                    offset: const Offset(0, 24),
+                  ),
+                ],
+              ),
+              child: PersonAvatar(p, diameter: 132),
             ),
           ),
-          alignment: const Alignment(0, -.2),
-          child: Text(
-            p.initials,
-            style: tx(
-              200,
-              weight: FontWeight.w800,
-              color: Colors.white.withValues(alpha: .35),
+          const SizedBox(height: 22),
+          FadeSlideIn(
+            child: Column(
+              children: [
+                Text(
+                  p.name,
+                  textAlign: TextAlign.center,
+                  style: tx(44, weight: FontWeight.w600),
+                ),
+                const SizedBox(height: 4),
+                Text('@${c.handle}', style: tx(17, color: AppColors.muted)),
+                if (c.bio.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                    child: _bio(),
+                  ),
+                const SizedBox(height: 4),
+                _actions(),
+              ],
+            ),
+          ),
+          const SizedBox(height: 14),
+          FadeSlideIn(
+            delay: const Duration(milliseconds: 120),
+            child: _numbers(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _actions() {
+    if (c.isMe) return TextLink(label: 'Edit profile', onTap: _editProfile);
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Pressable(
+          onTap: () => feed.toggleFollow(c),
+          child: AnimatedContainer(
+            duration: Motion.fast,
+            height: 44,
+            padding: const EdgeInsets.symmetric(horizontal: 22),
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: c.followed ? AppColors.bubble : AppColors.accent,
+              borderRadius: BorderRadius.circular(22),
+            ),
+            child: Text(
+              c.followed ? 'Following' : 'Follow',
+              style: tx(
+                16,
+                weight: FontWeight.w500,
+                color: c.followed ? AppColors.ink : Colors.white,
+              ),
             ),
           ),
         ),
+        const SizedBox(width: 20),
+        TextLink(label: 'Message', onTap: _message),
+      ],
+    );
+  }
+
+  /// One big number on black, two smaller ones on white.
+  Widget _numbers() {
+    return Column(
+      children: [
         Container(
-          margin: const EdgeInsets.only(top: 432),
-          padding: const EdgeInsets.fromLTRB(28, 26, 28, 0),
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(40)),
+          width: double.infinity,
+          padding: const EdgeInsets.fromLTRB(22, 20, 22, 8),
+          decoration: BoxDecoration(
+            color: AppColors.hero,
+            borderRadius: BorderRadius.circular(26),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(p.name, style: tx(20, weight: FontWeight.w700)),
-                        const SizedBox(height: 2),
-                        Text(
-                          '@${c.handle}',
-                          style: tx(15, color: const Color(0xFF555555)),
-                        ),
-                      ],
-                    ),
-                  ),
-                  GestureDetector(
-                    onTap: c.isMe ? _editProfile : () => feed.toggleFollow(c),
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 200),
-                      width: 160,
-                      height: 52,
-                      alignment: Alignment.center,
-                      decoration: BoxDecoration(
-                        color: !c.isMe && !c.followed
-                            ? AppColors.ink
-                            : AppColors.bubble,
-                        borderRadius: BorderRadius.circular(26),
-                      ),
-                      child: Text(
-                        c.isMe
-                            ? 'Edit profile'
-                            : (c.followed ? 'Following' : 'Follow'),
-                        style: tx(
-                          15,
-                          weight: FontWeight.w700,
-                          color: !c.isMe && !c.followed
-                              ? Colors.white
-                              : AppColors.ink,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 46),
-              Row(
-                children: [
-                  _stat(c.followers, 'Followers'),
-                  const SizedBox(width: 14),
-                  _stat(c.following, 'Following'),
-                  const SizedBox(width: 14),
-                  _stat(c.likes, 'Likes'),
-                ],
-              ),
-              const SizedBox(height: 12),
-              GestureDetector(
-                onTap: c.isMe
-                    ? () => _snack('Share profile: coming soon')
-                    : _message,
-                child: Container(
-                  height: 68,
-                  decoration: BoxDecoration(
-                    color: AppColors.bubble,
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        c.isMe
-                            ? Icons.ios_share_rounded
-                            : Icons.chat_bubble_outline_rounded,
-                      ),
-                      const SizedBox(width: 10),
-                      Text(
-                        c.isMe ? 'Share profile' : 'Message',
-                        style: tx(16, weight: FontWeight.w700),
-                      ),
-                    ],
+              Text('Followers', style: tx(15, color: AppColors.nightMuted)),
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.centerLeft,
+                child: CountUp(
+                  value: c.followers,
+                  format: compact,
+                  style: tx(
+                    72,
+                    weight: FontWeight.w600,
+                    color: AppColors.nightInk,
                   ),
                 ),
               ),
-              const SizedBox(height: 14),
-              if (c.bio.isNotEmpty) _bio(),
-              const SizedBox(height: 8),
+              c.isMe
+                  ? TextLink(
+                      label: 'Share profile',
+                      dark: true,
+                      onTap: () => _snack('Share profile: coming soon'),
+                    )
+                  : TextLink(
+                      label: 'Challenge ${c.person.firstName}',
+                      dark: true,
+                      onTap: () =>
+                          challengeFriend(context, widget.store, c.person),
+                    ),
             ],
           ),
+        ),
+        const SizedBox(height: 10),
+        Row(
+          children: [
+            _stat(c.following, 'Following'),
+            const SizedBox(width: 10),
+            _stat(c.likes, 'Likes'),
+          ],
         ),
       ],
     );
@@ -410,20 +424,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Widget _stat(int value, String label) => Expanded(
     child: Container(
-      height: 88,
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
       decoration: BoxDecoration(
-        color: AppColors.bubble,
-        borderRadius: BorderRadius.circular(20),
+        color: AppColors.card,
+        borderRadius: BorderRadius.circular(26),
       ),
       child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           CountUp(
             value: value,
             format: compact,
-            style: tx(22, weight: FontWeight.w800),
+            style: tx(40, weight: FontWeight.w600),
           ),
-          Text(label, style: tx(12, color: const Color(0xFF555555))),
+          Text(label, style: tx(15, color: AppColors.muted)),
         ],
       ),
     ),
@@ -435,10 +449,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
         for (final w in c.bio.split(' '))
           TextSpan(
             text: '$w ',
-            style: w.startsWith('@') ? tx(14, weight: FontWeight.w700) : tx(14),
+            style: tx(
+              17,
+              color: w.startsWith('@') ? AppColors.link : AppColors.muted,
+            ),
           ),
       ],
     ),
+    textAlign: TextAlign.center,
   );
 }
 
@@ -459,9 +477,9 @@ class _TabsHeader extends SliverPersistentHeaderDelegate {
   final double leftInset;
 
   @override
-  double get minExtent => 48 + top;
+  double get minExtent => 60 + top;
   @override
-  double get maxExtent => 48 + top;
+  double get maxExtent => 60 + top;
 
   @override
   Widget build(
@@ -473,23 +491,28 @@ class _TabsHeader extends SliverPersistentHeaderDelegate {
     final pinned = shrinkOffset > 0 || overlapsContent;
     return Container(
       height: maxExtent,
-      color: Colors.white,
+      color: AppColors.page,
       padding: EdgeInsets.only(
         top: pinned ? top : 0,
         bottom: pinned ? 0 : top,
-        left: pinned ? leftInset : 0,
+        left: pinned ? leftInset + 8 : 8,
+        right: 8,
       ),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
           for (var i = 0; i < tabs.length; i++)
-            Flexible(
-              child: GestureDetector(
+            Expanded(
+              child: Pressable(
                 onTap: () => onSelect(i),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                    vertical: 12,
-                    horizontal: 4,
+                child: AnimatedContainer(
+                  duration: Motion.fast,
+                  height: 44,
+                  margin: const EdgeInsets.symmetric(horizontal: 2),
+                  padding: const EdgeInsets.symmetric(horizontal: 6),
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: i == selected ? AppColors.ink : Colors.transparent,
+                    borderRadius: BorderRadius.circular(22),
                   ),
                   child: FittedBox(
                     fit: BoxFit.scaleDown,
@@ -497,9 +520,7 @@ class _TabsHeader extends SliverPersistentHeaderDelegate {
                       tabs[i],
                       style: tx(
                         15,
-                        weight: i == selected
-                            ? FontWeight.w700
-                            : FontWeight.w400,
+                        color: i == selected ? AppColors.onInk : AppColors.ink,
                       ),
                     ),
                   ),

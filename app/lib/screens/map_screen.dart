@@ -8,7 +8,9 @@ import '../models.dart';
 import '../theme.dart';
 import '../widgets/avatar.dart';
 import '../widgets/friend_profile_sheet.dart';
+import '../widgets/glass.dart';
 import '../widgets/map_views.dart';
+import '../widgets/motion.dart';
 import '../games/challenge.dart';
 import 'call_screen.dart';
 import 'profile_screen.dart';
@@ -21,7 +23,7 @@ const useRealMapByDefault = bool.fromEnvironment(
   defaultValue: !kIsWeb,
 );
 
-/// Figma: map frame (node 4:74) + friend card (node 15:124).
+/// Friends on a quiet map, with a frosted card for the one you tap.
 /// Works like Snap Map: friends appear where they are, tap one to fly to
 /// them and open their card over the map.
 class MapScreen extends StatefulWidget {
@@ -96,14 +98,14 @@ class _MapScreenState extends State<MapScreen> {
     showModalBottomSheet(
       context: context,
       showDragHandle: true,
-      backgroundColor: Colors.white,
+      backgroundColor: AppColors.card,
       builder: (ctx) => ListenableBuilder(
         listenable: store,
         builder: (ctx, _) => SafeArea(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text('Map settings', style: tx(18, weight: FontWeight.w700)),
+              Text('Map settings', style: tx(22, weight: FontWeight.w600)),
               const SizedBox(height: 8),
               SwitchListTile(
                 secondary: const Icon(Icons.visibility_off_outlined),
@@ -184,107 +186,94 @@ class _MapScreenState extends State<MapScreen> {
   Widget _topBar(BuildContext context) {
     final top = MediaQuery.paddingOf(context).top + 10;
     final sel = _selected;
+    final near = store.spots.where((s) => s.online).length;
     return Positioned(
-      left: 0,
-      right: 0,
+      left: 12,
+      right: 12,
       top: top,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 14),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Me: tap to come back to my position.
-            GestureDetector(
-              onTap: () {
-                setState(() => _route = null);
-                _map.currentState?.focusMe();
-              },
-              child: Column(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(3),
-                    decoration: const BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: Colors.white,
-                    ),
-                    child: PersonAvatar(store.me, diameter: 42),
-                  ),
-                  Container(
-                    margin: const EdgeInsets.only(top: 2),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 6,
-                      vertical: 1,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: Text(
-                      store.ghostMode ? 'Ghost' : 'Online',
-                      style: tx(
-                        10,
-                        weight: FontWeight.w600,
-                        color: AppColors.muted,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: Glass(
+                radius: 26,
+                shadow: true,
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(18, 12, 18, 12),
+                  child: AnimatedSize(
+                    duration: Motion.normal,
+                    curve: Motion.ease,
+                    alignment: Alignment.topLeft,
+                    child: AnimatedSwitcher(
+                      duration: Motion.fast,
+                      child: Text.rich(
+                        key: ValueKey(sel?.person.id),
+                        TextSpan(
+                          children: [
+                            TextSpan(
+                              text: sel == null
+                                  ? '$near friends\n'
+                                  : '${sel.person.firstName}\n',
+                            ),
+                            TextSpan(
+                              text: sel == null
+                                  ? 'nearby.'
+                                  : (sel.online
+                                        ? sel.place
+                                        : 'Seen ${sel.updated}'),
+                              style: tx(
+                                sel == null ? 28 : 15,
+                                weight: sel == null
+                                    ? FontWeight.w600
+                                    : FontWeight.w400,
+                                color: AppColors.muted,
+                              ),
+                            ),
+                          ],
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: tx(28, weight: FontWeight.w600),
                       ),
                     ),
                   ),
-                ],
-              ),
-            ),
-            Expanded(
-              child: AnimatedSwitcher(
-                duration: const Duration(milliseconds: 200),
-                child: sel == null
-                    ? const SizedBox.shrink()
-                    : Column(
-                        key: ValueKey(sel.person.id),
-                        children: [
-                          PersonAvatar(sel.person, diameter: 44, border: 3),
-                          Container(
-                            margin: const EdgeInsets.only(top: 2),
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 22,
-                              vertical: 4,
-                            ),
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: Column(
-                              children: [
-                                Text(
-                                  sel.person.firstName,
-                                  style: tx(15, weight: FontWeight.w800),
-                                ),
-                                Text(
-                                  sel.online
-                                      ? 'Online · ${sel.place}'
-                                      : 'Seen ${sel.updated}',
-                                  style: tx(9, color: AppColors.muted),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-              ),
-            ),
-            Material(
-              color: Colors.white,
-              shape: const CircleBorder(),
-              elevation: 1,
-              child: InkWell(
-                customBorder: const CircleBorder(),
-                onTap: _openFilters,
-                child: const SizedBox(
-                  width: 46,
-                  height: 46,
-                  child: Icon(Icons.tune_rounded),
                 ),
               ),
             ),
-          ],
-        ),
+          ),
+          const SizedBox(width: 10),
+          Column(
+            children: [
+              // Me: tap to come back to my position.
+              Tooltip(
+                message: store.ghostMode ? 'Ghost mode is on' : 'My position',
+                child: Pressable(
+                  scale: .9,
+                  onTap: () {
+                    setState(() => _route = null);
+                    _map.currentState?.focusMe();
+                  },
+                  child: Opacity(
+                    opacity: store.ghostMode ? .55 : 1,
+                    child: PersonAvatar(store.me, diameter: 48),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 10),
+              Glass(
+                radius: 24,
+                shadow: true,
+                child: IconButton(
+                  tooltip: 'Map settings',
+                  onPressed: _openFilters,
+                  icon: const Icon(Icons.tune_rounded),
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -300,16 +289,16 @@ class _MapScreenState extends State<MapScreen> {
         child: TweenAnimationBuilder<double>(
           key: ValueKey(s.person.id),
           tween: Tween(begin: 1, end: 0),
-          duration: const Duration(milliseconds: 320),
-          curve: Curves.easeOutCubic,
+          duration: Motion.normal,
+          curve: Motion.ease,
           builder: (context, v, child) =>
               FractionalTranslation(translation: Offset(0, v), child: child),
           child: DraggableScrollableSheet(
-            initialChildSize: .56,
+            initialChildSize: .42,
             minChildSize: 0,
             maxChildSize: .86,
             snap: true,
-            snapSizes: const [.56],
+            snapSizes: const [.42],
             builder: (context, scroll) => FriendProfileSheet(
               spot: s,
               distanceKm: _distanceKm(s),

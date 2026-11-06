@@ -4,7 +4,6 @@ import '../feed.dart';
 import '../theme.dart';
 import 'avatar.dart';
 
-/// Figma: comments over the video (frame 50:407).
 Future<void> showComments(BuildContext context, FeedData feed, Post post) {
   return showModalBottomSheet(
     context: context,
@@ -29,6 +28,12 @@ class _CommentsSheetState extends State<_CommentsSheet> {
   final Set<Comment> _translated = {};
   final Set<Comment> _expanded = {};
   Comment? _replyTo;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.feed.loadComments(widget.post);
+  }
 
   @override
   void dispose() {
@@ -62,8 +67,8 @@ class _CommentsSheetState extends State<_CommentsSheet> {
         maxChildSize: .92,
         expand: false,
         builder: (context, scroll) => Container(
-          decoration: const BoxDecoration(
-            color: Colors.white,
+          decoration: BoxDecoration(
+            color: AppColors.card,
             borderRadius: BorderRadius.vertical(top: Radius.circular(40)),
           ),
           child: ListenableBuilder(
@@ -131,7 +136,7 @@ class _CommentsSheetState extends State<_CommentsSheet> {
         children: [
           Container(
             padding: const EdgeInsets.all(2),
-            decoration: const BoxDecoration(
+            decoration: BoxDecoration(
               shape: BoxShape.circle,
               color: AppColors.bubble,
             ),
@@ -177,7 +182,7 @@ class _CommentsSheetState extends State<_CommentsSheet> {
                   ),
                 Text(
                   translated && c.translation != null ? c.translation! : c.text,
-                  style: tx(13),
+                  style: tx(15),
                 ),
                 const SizedBox(height: 3),
                 Row(
@@ -185,8 +190,8 @@ class _CommentsSheetState extends State<_CommentsSheet> {
                     GestureDetector(
                       onTap: () => _reply(c),
                       child: Text(
-                        'reply',
-                        style: tx(11, weight: FontWeight.w700),
+                        'Reply',
+                        style: tx(13, color: AppColors.link),
                       ),
                     ),
                     if (c.translation != null) ...[
@@ -199,7 +204,7 @@ class _CommentsSheetState extends State<_CommentsSheet> {
                         ),
                         child: Text(
                           translated ? 'See original' : 'See translation',
-                          style: tx(11, weight: FontWeight.w700),
+                          style: tx(13, color: AppColors.link),
                         ),
                       ),
                     ],
@@ -215,7 +220,7 @@ class _CommentsSheetState extends State<_CommentsSheet> {
                 Icon(
                   c.liked ? Icons.favorite : Icons.favorite_border,
                   size: 22,
-                  color: c.liked ? const Color(0xFFE5484D) : AppColors.ink,
+                  color: c.liked ? AppColors.danger : AppColors.ink,
                 ),
                 const SizedBox(width: 4),
                 SizedBox(
@@ -238,8 +243,8 @@ class _CommentsSheetState extends State<_CommentsSheet> {
       top: false,
       child: Container(
         padding: const EdgeInsets.fromLTRB(14, 8, 8, 8),
-        decoration: const BoxDecoration(
-          border: Border(top: BorderSide(color: Color(0xFFEEEEEE))),
+        decoration: BoxDecoration(
+          border: Border(top: BorderSide(color: AppColors.line)),
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -257,7 +262,7 @@ class _CommentsSheetState extends State<_CommentsSheet> {
                     const Spacer(),
                     GestureDetector(
                       onTap: () => setState(() => _replyTo = null),
-                      child: const Icon(
+                      child: Icon(
                         Icons.close,
                         size: 16,
                         color: AppColors.muted,
@@ -279,7 +284,7 @@ class _CommentsSheetState extends State<_CommentsSheet> {
                     decoration: InputDecoration(
                       isDense: true,
                       filled: true,
-                      fillColor: const Color(0xFFF2F2F2),
+                      fillColor: AppColors.page,
                       hintText: 'Add a comment…',
                       hintStyle: tx(14, color: AppColors.muted),
                       border: OutlineInputBorder(
@@ -291,7 +296,7 @@ class _CommentsSheetState extends State<_CommentsSheet> {
                 ),
                 IconButton(
                   onPressed: _send,
-                  icon: const Icon(Icons.send_rounded, color: AppColors.accent),
+                  icon: Icon(Icons.send_rounded, color: AppColors.accent),
                 ),
               ],
             ),

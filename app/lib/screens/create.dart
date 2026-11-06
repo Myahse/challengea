@@ -7,6 +7,7 @@ import '../feed.dart';
 import '../stories.dart';
 import '../theme.dart';
 import '../widgets/avatar.dart';
+import '../widgets/glass.dart';
 import '../widgets/motion.dart';
 
 /// Backgrounds for text posts and text stories.
@@ -67,7 +68,7 @@ Future<void> showCreateMenu(
   return showModalBottomSheet(
     context: context,
     showDragHandle: true,
-    backgroundColor: Colors.white,
+    backgroundColor: AppColors.card,
     builder: (ctx) => SafeArea(
       child: Padding(
         padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
@@ -75,7 +76,7 @@ Future<void> showCreateMenu(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Create', style: tx(24, weight: FontWeight.w800)),
+            Text('Create', style: tx(34, weight: FontWeight.w600)),
             const SizedBox(height: 14),
             GridView.count(
               crossAxisCount: 3,
@@ -99,31 +100,57 @@ Future<void> showCreateMenu(
                       child: Opacity(
                         opacity: items[i].$5 == null ? .5 : 1,
                         child: Container(
+                          clipBehavior: Clip.antiAlias,
                           decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(22),
-                            gradient: LinearGradient(
-                              colors: items[i].$4,
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                            ),
+                            color: AppColors.hero,
+                            borderRadius: BorderRadius.circular(24),
                           ),
-                          padding: const EdgeInsets.all(12),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                          child: Stack(
                             children: [
-                              Icon(items[i].$1, color: Colors.white, size: 30),
-                              const Spacer(),
-                              Text(
-                                items[i].$2,
-                                style: tx(
-                                  16,
-                                  weight: FontWeight.w800,
-                                  color: Colors.white,
+                              Positioned(
+                                right: -30,
+                                top: -30,
+                                child: Orb(
+                                  color: items[i].$4.first,
+                                  diameter: 96,
+                                  glow: 30,
                                 ),
                               ),
-                              Text(
-                                items[i].$3,
-                                style: tx(11, color: Colors.white70),
+                              Positioned(
+                                right: 10,
+                                top: 10,
+                                child: Icon(
+                                  items[i].$1,
+                                  color: Colors.white,
+                                  size: 22,
+                                ),
+                              ),
+                              Positioned(
+                                left: 12,
+                                right: 12,
+                                bottom: 12,
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      items[i].$2,
+                                      style: tx(
+                                        17,
+                                        weight: FontWeight.w600,
+                                        color: AppColors.nightInk,
+                                      ),
+                                    ),
+                                    Text(
+                                      items[i].$3,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: tx(
+                                        12,
+                                        color: AppColors.nightMuted,
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ),
                             ],
                           ),
@@ -252,10 +279,10 @@ class _PostComposerState extends State<_PostComposer> {
   Widget build(BuildContext context) {
     final me = widget.store.me;
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: AppColors.card,
       appBar: AppBar(
-        backgroundColor: Colors.white,
-        surfaceTintColor: Colors.white,
+        backgroundColor: AppColors.card,
+        surfaceTintColor: Colors.transparent,
         leading: IconButton(
           onPressed: () => Navigator.pop(context),
           icon: const Icon(Icons.close_rounded),
@@ -275,9 +302,7 @@ class _PostComposerState extends State<_PostComposer> {
                     vertical: 9,
                   ),
                   decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: AppColors.brandGradient,
-                    ),
+                    gradient: LinearGradient(colors: AppColors.brandGradient),
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Text(
@@ -354,7 +379,7 @@ class _PostComposerState extends State<_PostComposer> {
                       style: _asCard
                           ? tx(26, weight: FontWeight.w800, color: Colors.white)
                           : tx(20),
-                      cursorColor: _asCard ? Colors.white : AppColors.ink,
+                      cursorColor: _asCard ? AppColors.onInk : AppColors.ink,
                       decoration: InputDecoration(
                         border: InputBorder.none,
                         hintText: 'What’s on your mind?',
@@ -407,7 +432,7 @@ class _PostComposerState extends State<_PostComposer> {
             top: false,
             child: Container(
               padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
-              decoration: const BoxDecoration(
+              decoration: BoxDecoration(
                 border: Border(top: BorderSide(color: AppColors.line)),
               ),
               child: Row(
@@ -463,9 +488,9 @@ class _PostComposerState extends State<_PostComposer> {
                   ),
                   IconButton(
                     onPressed: () => _addPhoto(),
-                    icon: const Icon(
+                    icon: Icon(
                       Icons.photo_library_rounded,
-                      color: Color(0xFF45BD62),
+                      color: AppColors.accent,
                     ),
                   ),
                   IconButton(
@@ -641,7 +666,7 @@ class _StoryCreatorState extends State<_StoryCreator> {
                 child: Container(
                   padding: const EdgeInsets.fromLTRB(16, 12, 20, 12),
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: AppColors.card,
                     borderRadius: BorderRadius.circular(30),
                   ),
                   child: Row(

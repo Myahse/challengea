@@ -5,6 +5,7 @@ import '../chat_store.dart';
 import '../stories.dart';
 import '../theme.dart';
 import '../widgets/avatar.dart';
+import '../widgets/glass.dart';
 import '../widgets/motion.dart';
 
 /// Full-screen stories, Snapchat / WhatsApp style.
@@ -31,13 +32,13 @@ class StoryViewer extends StatefulWidget {
       PageRouteBuilder(
         opaque: false,
         barrierColor: Colors.black,
-        transitionDuration: Motion.normal,
+        transitionDuration: const Duration(milliseconds: 520),
         reverseTransitionDuration: Motion.normal,
         pageBuilder: (_, a, _) => FadeTransition(
           opacity: a,
           child: ScaleTransition(
             scale: Tween(
-              begin: .92,
+              begin: .8,
               end: 1.0,
             ).animate(CurvedAnimation(parent: a, curve: Motion.ease)),
             child: StoryViewer(store: store, stories: stories, start: start),
@@ -163,11 +164,19 @@ class _StoryPageState extends State<_StoryPage>
 
   void _sync() {
     if (widget.active && story.items.isNotEmpty) {
-      widget.store.markStorySeen(story);
+      _markSeen();
       if (!_timer.isAnimating && !_focus.hasFocus) _timer.forward();
     } else {
       _timer.stop();
     }
+  }
+
+  /// After the frame: the story row behind this page rebuilds too.
+  void _markSeen() {
+    final item = story.items[_index];
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) widget.store.markStorySeen(story, item);
+    });
   }
 
   void _resume() {
@@ -177,6 +186,7 @@ class _StoryPageState extends State<_StoryPage>
   void _forward() {
     if (_index < story.items.length - 1) {
       setState(() => _index++);
+      _markSeen();
       _timer.forward(from: 0);
     } else {
       widget.onDone();
@@ -290,18 +300,22 @@ class _StoryPageState extends State<_StoryPage>
                 const SizedBox(height: 10),
                 Row(
                   children: [
-                    PersonAvatar(story.person, diameter: 36, border: 1.5),
+                    PersonAvatar(story.person, diameter: 34),
                     const SizedBox(width: 10),
-                    Text(
-                      _mine ? 'Your story' : story.person.name,
-                      style: tx(
-                        15,
-                        weight: FontWeight.w700,
-                        color: Colors.white,
+                    Flexible(
+                      child: Text(
+                        _mine ? 'Your story' : story.person.name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: tx(
+                          16,
+                          weight: FontWeight.w600,
+                          color: Colors.white,
+                        ),
                       ),
                     ),
                     const SizedBox(width: 8),
-                    Text(item.ago, style: tx(13, color: Colors.white70)),
+                    Text(item.ago, style: tx(15, color: AppColors.nightMuted)),
                     const Spacer(),
                     IconButton(
                       onPressed: () => Navigator.of(context).pop(),
@@ -352,16 +366,16 @@ class _StoryPageState extends State<_StoryPage>
                         controller: _reply,
                         focusNode: _focus,
                         onSubmitted: _send,
-                        style: tx(15, color: Colors.white),
+                        style: tx(16, color: Colors.white),
                         cursorColor: Colors.white,
                         decoration: InputDecoration(
-                          hintText: 'Reply to ${story.person.firstName}…',
-                          hintStyle: tx(15, color: Colors.white70),
+                          hintText: 'Reply to ${story.person.firstName}',
+                          hintStyle: tx(16, color: Colors.white),
                           filled: true,
-                          fillColor: Colors.white12,
+                          fillColor: Colors.black.withValues(alpha: .5),
                           contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 18,
-                            vertical: 14,
+                            horizontal: 20,
+                            vertical: 15,
                           ),
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(28),
@@ -391,74 +405,103 @@ class _StoryPageState extends State<_StoryPage>
   }
 
   Widget _slide(StoryItem item) {
-    if (item.photo != null) {
+    final image = item.image;
+    if (image != null) {
       return Stack(
         fit: StackFit.expand,
         children: [
-          Image.memory(item.photo!, fit: BoxFit.cover),
+          TweenAnimationBuilder<double>(
+            tween: Tween(begin: 1.08, end: 1),
+            duration: const Duration(seconds: 5),
+            curve: Curves.easeOut,
+            builder: (context, v, child) =>
+                Transform.scale(scale: v, child: child),
+            child: Image(image: image, fit: BoxFit.cover),
+          ),
           if (item.text != null) _caption(item.text!),
         ],
       );
     }
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: item.colors,
-        ),
-      ),
-      child: Center(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 32),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (item.emoji != null)
-                FadeSlideIn(
-                  scale: .4,
-                  offset: Offset.zero,
-                  child: Text(
-                    item.emoji!,
-                    style: const TextStyle(fontSize: 110),
-                  ),
+    // Words on black, with one glossy bubble rising behind them.
+    final text = item.text ?? '';
+    final size = text.length <= 24 ? 56.0 : (text.length <= 60 ? 42.0 : 30.0);
+    final width = MediaQuery.sizeOf(context).width;
+    return ColoredBox(
+      color: AppColors.night,
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          Positioned(
+            left: -width * .23,
+            right: -width * .23,
+            bottom: -width * .42,
+            child: TweenAnimationBuilder<double>(
+              tween: Tween(begin: .72, end: 1),
+              duration: const Duration(milliseconds: 1400),
+              curve: Motion.ease,
+              builder: (context, v, child) => Transform.scale(
+                scale: v,
+                child: Opacity(opacity: v.clamp(.0, 1.0), child: child),
+              ),
+              child: Center(
+                child: Orb(
+                  color: item.colors.first,
+                  diameter: width * 1.46,
+                  glow: 110,
                 ),
-              if (item.text != null) ...[
-                const SizedBox(height: 18),
-                FadeSlideIn(
-                  delay: const Duration(milliseconds: 120),
-                  child: Text(
-                    item.text!,
-                    textAlign: TextAlign.center,
-                    style: tx(28, weight: FontWeight.w800, color: Colors.white)
-                        .copyWith(
-                          shadows: const [
-                            Shadow(color: Colors.black26, blurRadius: 12),
-                          ],
-                        ),
-                  ),
-                ),
-              ],
-            ],
+              ),
+            ),
           ),
-        ),
+          Align(
+            alignment: const Alignment(0, -.42),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              child: FadeSlideIn(
+                delay: const Duration(milliseconds: 240),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (item.emoji != null)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 14),
+                        child: Text(
+                          item.emoji!,
+                          style: const TextStyle(fontSize: 64),
+                        ),
+                      ),
+                    Text(
+                      text,
+                      textAlign: TextAlign.center,
+                      style: tx(
+                        size,
+                        weight: FontWeight.w600,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
 
   Widget _caption(String text) => Align(
-    alignment: const Alignment(0, .55),
-    child: Container(
-      margin: const EdgeInsets.symmetric(horizontal: 24),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-      decoration: BoxDecoration(
-        color: Colors.black45,
-        borderRadius: BorderRadius.circular(14),
-      ),
-      child: Text(
-        text,
-        textAlign: TextAlign.center,
-        style: tx(18, weight: FontWeight.w700, color: Colors.white),
+    alignment: const Alignment(0, .5),
+    child: Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 24),
+      child: Glass(
+        dark: true,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+          child: Text(
+            text,
+            textAlign: TextAlign.center,
+            style: tx(20, weight: FontWeight.w600, color: Colors.white),
+          ),
+        ),
       ),
     ),
   );

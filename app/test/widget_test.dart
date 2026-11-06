@@ -12,6 +12,7 @@ import 'package:challengea/models.dart';
 import 'package:challengea/screens/chat_home.dart';
 import 'package:challengea/screens/map_screen.dart';
 import 'package:challengea/screens/profile_screen.dart';
+import 'package:challengea/theme.dart';
 
 void main() {
   testWidgets('chat home shows the bubble field', (tester) async {
@@ -30,8 +31,31 @@ void main() {
     await tester.pumpWidget(ChallengeaApp(store: ChatStore()));
     await tester.pump(const Duration(milliseconds: 800));
     expect(find.text('Your story'), findsOneWidget);
+    await tester.dragUntilVisible(
+      find.text('Tales'),
+      find.byType(CustomScrollView),
+      const Offset(0, -300),
+    );
+    await tester.pump(const Duration(milliseconds: 300));
     expect(find.text('Tales'), findsOneWidget);
-    expect(find.text('Chats'), findsOneWidget); // menu
+    expect(find.byTooltip('Chats'), findsOneWidget); // menu
+  });
+
+  testWidgets('the app follows the phone between light and dark', (
+    tester,
+  ) async {
+    addTearDown(tester.platformDispatcher.clearPlatformBrightnessTestValue);
+    tester.platformDispatcher.platformBrightnessTestValue = Brightness.light;
+    await tester.pumpWidget(ChallengeaApp(store: ChatStore()));
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(AppColors.dark, isFalse);
+    final lightPage = AppColors.page;
+
+    tester.platformDispatcher.platformBrightnessTestValue = Brightness.dark;
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(AppColors.dark, isTrue);
+    expect(AppColors.page, isNot(lightPage));
+    expect(tester.takeException(), isNull);
   });
 
   test('merging two friends creates a group, merging again adds to it', () {
@@ -148,9 +172,7 @@ void main() {
     expect(post.commentCount, count + 2);
   });
 
-  testWidgets('profile shows the tabs from Figma and opens on my profile', (
-    tester,
-  ) async {
+  testWidgets('profile shows the tabs and opens on my profile', (tester) async {
     tester.view.physicalSize = const Size(430, 932);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
@@ -165,6 +187,7 @@ void main() {
     expect(find.text('@Boby_pop'), findsOneWidget);
     expect(find.text('24 posts'), findsOneWidget);
     expect(find.text('45 tags'), findsOneWidget);
+    await tester.pump(const Duration(seconds: 2)); // entrance animation
     await tester.tap(find.text('Follow'));
     await tester.pump(const Duration(milliseconds: 300));
     expect(

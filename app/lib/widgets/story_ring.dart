@@ -3,8 +3,10 @@ import 'package:flutter/material.dart';
 import '../models.dart';
 import '../theme.dart';
 import 'avatar.dart';
+import 'glass.dart';
 
-/// Avatar inside a story ring: gradient = new story, grey = seen.
+/// A friend's bubble: a thin blue ring and a slow drift mean a new story.
+/// Once seen, the bubble rests and the ring goes.
 class StoryRing extends StatelessWidget {
   const StoryRing({
     super.key,
@@ -20,25 +22,23 @@ class StoryRing extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    final fresh = hasStory && !seen;
+    final bubble = Container(
       width: size,
       height: size,
-      padding: const EdgeInsets.all(2.5),
+      padding: const EdgeInsets.all(3.5),
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        gradient: hasStory && !seen
-            ? const SweepGradient(colors: AppColors.storyGradient)
-            : null,
-        color: hasStory && seen ? const Color(0xFFD6D6D6) : null,
+        border: fresh ? Border.all(color: AppColors.accent, width: 2) : null,
       ),
-      child: Container(
-        padding: const EdgeInsets.all(2.5),
-        decoration: const BoxDecoration(
-          shape: BoxShape.circle,
-          color: Colors.white,
-        ),
-        child: PersonAvatar(person, diameter: size - 10),
-      ),
+      child: PersonAvatar(person, diameter: size - 11),
     );
+    return fresh
+        ? Floaty(
+            distance: 3,
+            phase: person.id.hashCode % 100 / 100,
+            child: bubble,
+          )
+        : bubble;
   }
 }

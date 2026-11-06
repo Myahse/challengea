@@ -7,6 +7,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart' hide Path;
 
 import '../chat_store.dart';
+import '../theme.dart';
 import '../geo.dart';
 import 'city_map.dart';
 import 'map_markers.dart';
@@ -353,6 +354,7 @@ class RealFriendMapState extends FriendMapState<RealFriendMap>
           // Fine for development. A production app with many users needs its
           // own tile provider (OSM's public servers have a fair-use policy).
           urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+          tileBuilder: AppColors.dark ? darkModeTileBuilder : null,
           userAgentPackageName: 'com.challengea.challengea',
           maxZoom: 19,
         ),
@@ -421,6 +423,7 @@ class RealMiniMap extends StatelessWidget {
         children: [
           TileLayer(
             urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+            tileBuilder: AppColors.dark ? darkModeTileBuilder : null,
             userAgentPackageName: 'com.challengea.challengea',
           ),
         ],

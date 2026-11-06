@@ -124,7 +124,7 @@ class _SignInScreenState extends State<SignInScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: AppColors.page,
       resizeToAvoidBottomInset: true,
       body: Stack(
         children: [
@@ -155,7 +155,7 @@ class _SignInScreenState extends State<SignInScreen>
                           onPressed: widget.onDemo,
                           child: Text(
                             'Just looking? Try the demo',
-                            style: tx(14, weight: FontWeight.w600),
+                            style: tx(16, color: AppColors.link),
                           ),
                         ),
                         const SizedBox(height: 12),
@@ -174,8 +174,8 @@ class _SignInScreenState extends State<SignInScreen>
   Widget _title() {
     return TweenAnimationBuilder<double>(
       tween: Tween(begin: 0, end: 1),
-      duration: const Duration(milliseconds: 900),
-      curve: Curves.easeOutCubic,
+      duration: const Duration(milliseconds: 1100),
+      curve: const Cubic(.16, 1, .3, 1),
       builder: (context, t, child) => Opacity(
         opacity: t,
         child: Transform.translate(
@@ -187,16 +187,13 @@ class _SignInScreenState extends State<SignInScreen>
         children: [
           Text(
             'Challengea',
-            style: tx(
-              44,
-              weight: FontWeight.w800,
-            ).copyWith(letterSpacing: -1.5),
+            style: tx(48, weight: FontWeight.w600, color: AppColors.ink),
           ),
           const SizedBox(height: 6),
           Text(
             'Chat, merge your bubbles, challenge your friends.',
             textAlign: TextAlign.center,
-            style: tx(15, color: const Color(0xFF555555)),
+            style: tx(17, color: AppColors.muted),
           ),
         ],
       ),
@@ -210,7 +207,7 @@ class _SignInScreenState extends State<SignInScreen>
       child: Container(
         padding: const EdgeInsets.fromLTRB(20, 22, 20, 20),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: AppColors.card,
           borderRadius: BorderRadius.circular(32),
           boxShadow: [
             BoxShadow(
@@ -252,7 +249,7 @@ class _SignInScreenState extends State<SignInScreen>
                       child: Text(
                         _error!,
                         textAlign: TextAlign.center,
-                        style: tx(13, color: const Color(0xFFE5484D)),
+                        style: tx(13, color: AppColors.danger),
                       ),
                     ),
             ),
@@ -291,7 +288,10 @@ class _SignInScreenState extends State<SignInScreen>
             const SizedBox(height: 4),
             TextButton(
               onPressed: () => _go(_Step.email),
-              child: Text('Use an email instead', style: tx(14)),
+              child: Text(
+                'Use an email instead',
+                style: tx(16, color: AppColors.link),
+              ),
             ),
           ],
         );
@@ -433,7 +433,7 @@ class _SignInScreenState extends State<SignInScreen>
         hintText: hint,
         hintStyle: tx(17, color: AppColors.muted),
         filled: true,
-        fillColor: const Color(0xFFF3F3F3),
+        fillColor: AppColors.page,
         prefixIcon: prefix == null
             ? null
             : Padding(
@@ -460,7 +460,7 @@ class _SignInScreenState extends State<SignInScreen>
       height: 56,
       child: FilledButton(
         style: FilledButton.styleFrom(
-          backgroundColor: AppColors.ink,
+          backgroundColor: AppColors.accent,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(18),
           ),
@@ -545,9 +545,7 @@ class _CodeInputState extends State<_CodeInput> {
                   height: 58,
                   alignment: Alignment.center,
                   decoration: BoxDecoration(
-                    color: i < code.length
-                        ? AppColors.ink
-                        : const Color(0xFFF3F3F3),
+                    color: i < code.length ? AppColors.ink : AppColors.page,
                     borderRadius: BorderRadius.circular(16),
                     border: Border.all(
                       color: i == code.length
@@ -578,7 +576,7 @@ class _CodeInputState extends State<_CodeInput> {
   }
 }
 
-/// Soft colored bubbles drifting behind the sign-in card.
+/// Glossy bubbles drifting behind the sign-in card.
 class _BubblesPainter extends CustomPainter {
   _BubblesPainter(this.t);
   final double t;
@@ -601,21 +599,36 @@ class _BubblesPainter extends CustomPainter {
       final a = 2 * pi * (t * speed + rnd.nextDouble());
       final base = Offset(
         rnd.nextDouble() * size.width,
-        rnd.nextDouble() * size.height * .62,
+        rnd.nextDouble() * size.height * .4,
       );
       final c = base + Offset(cos(a) * 22, sin(a * 1.3) * 26);
       final r = 22 + rnd.nextDouble() * 46;
       final color = _colors[i % _colors.length];
+      final box = Rect.fromCircle(center: c, radius: r);
       canvas.drawCircle(
         c,
         r,
         Paint()
           ..shader = RadialGradient(
+            center: const Alignment(0, .18),
+            radius: .82,
             colors: [
-              color.withValues(alpha: .55),
-              color.withValues(alpha: .18),
+              Color.lerp(color, Colors.white, .32)!,
+              color,
+              Color.lerp(color, Colors.black, .62)!,
             ],
-          ).createShader(Rect.fromCircle(center: c, radius: r)),
+            stops: const [0, .68, 1],
+          ).createShader(box),
+      );
+      canvas.drawCircle(
+        c,
+        r,
+        Paint()
+          ..shader = const RadialGradient(
+            center: Alignment(-.34, -.5),
+            radius: .52,
+            colors: [Color(0xE6FFFFFF), Color(0x00FFFFFF)],
+          ).createShader(box),
       );
     }
   }

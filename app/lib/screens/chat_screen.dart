@@ -13,7 +13,6 @@ import '../games/challenge.dart';
 import 'call_screen.dart';
 import 'profile_screen.dart';
 
-/// Figma: conversation frame (node 7:21). Works for 1-to-1 and group chats.
 class ChatScreen extends StatefulWidget {
   const ChatScreen({super.key, required this.store, required this.node});
   final ChatStore store;
@@ -78,8 +77,8 @@ class _ChatScreenState extends State<ChatScreen> {
     return Scaffold(
       backgroundColor: AppColors.chatBackground,
       appBar: AppBar(
-        backgroundColor: Colors.white,
-        surfaceTintColor: Colors.white,
+        backgroundColor: AppColors.page,
+        surfaceTintColor: Colors.transparent,
         titleSpacing: 0,
         title: GestureDetector(
           onTap: node.isGroup
@@ -142,7 +141,7 @@ class _ChatScreenState extends State<ChatScreen> {
               builder: (context, _) {
                 final msgs = node.messages.reversed.toList();
                 if (msgs.isEmpty && widget.store.isOnline && !node.loaded) {
-                  return const Center(
+                  return Center(
                     child: CircularProgressIndicator(
                       strokeWidth: 2,
                       color: AppColors.ink,
@@ -179,7 +178,7 @@ class _ChatScreenState extends State<ChatScreen> {
     showModalBottomSheet(
       context: context,
       showDragHandle: true,
-      backgroundColor: Colors.white,
+      backgroundColor: AppColors.card,
       builder: (ctx) => SafeArea(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -212,7 +211,7 @@ class _ChatScreenState extends State<ChatScreen> {
   Future<Person?> _pickMember() => showModalBottomSheet<Person>(
     context: context,
     showDragHandle: true,
-    backgroundColor: Colors.white,
+    backgroundColor: AppColors.card,
     builder: (ctx) => SafeArea(
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -239,9 +238,9 @@ class _ChatScreenState extends State<ChatScreen> {
         margin: const EdgeInsets.only(bottom: 12, top: 2),
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: AppColors.card,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: const Color(0xFFE6E6E6)),
+          border: Border.all(color: AppColors.bubble),
         ),
         child: Row(
           children: [
@@ -313,11 +312,7 @@ class _ChatScreenState extends State<ChatScreen> {
           ),
           child: Text(
             '${m.text}  ·  ${_time(m.time)}',
-            style: tx(
-              12,
-              weight: FontWeight.w600,
-              color: const Color(0xFF555555),
-            ),
+            style: tx(12, weight: FontWeight.w600, color: AppColors.muted),
           ),
         ),
       );
@@ -345,10 +340,10 @@ class _ChatScreenState extends State<ChatScreen> {
           left: mine ? 40 : 0,
           right: mine ? 0 : 40,
         ),
-        padding: const EdgeInsets.fromLTRB(12, 8, 10, 6),
+        padding: const EdgeInsets.fromLTRB(14, 10, 12, 8),
         decoration: BoxDecoration(
           color: mine ? AppColors.sent : AppColors.received,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(20),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -365,20 +360,31 @@ class _ChatScreenState extends State<ChatScreen> {
                   ),
                 ),
               ),
-            Text(m.text, style: tx(14)),
+            Text(
+              m.text,
+              style: tx(16, color: mine ? AppColors.onSent : AppColors.ink),
+            ),
             const SizedBox(height: 2),
             Align(
               alignment: Alignment.centerRight,
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text(_time(m.time), style: tx(10, color: AppColors.muted)),
+                  Text(
+                    _time(m.time),
+                    style: tx(
+                      11,
+                      color: mine
+                          ? AppColors.onSent.withValues(alpha: .86)
+                          : AppColors.muted,
+                    ),
+                  ),
                   if (mine) ...[
                     const SizedBox(width: 3),
                     const Icon(
                       Icons.done_all,
                       size: 13,
-                      color: AppColors.online,
+                      color: AppColors.onSent,
                     ),
                   ],
                 ],
@@ -402,7 +408,7 @@ class _ChatScreenState extends State<ChatScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 4),
             height: 52,
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: AppColors.card,
               borderRadius: BorderRadius.circular(26),
             ),
             child: Row(
@@ -472,7 +478,7 @@ class _ChatScreenState extends State<ChatScreen> {
                             width: 42,
                             height: 42,
                             margin: const EdgeInsets.only(right: 2),
-                            decoration: const BoxDecoration(
+                            decoration: BoxDecoration(
                               shape: BoxShape.circle,
                               color: AppColors.accent,
                             ),
@@ -570,12 +576,12 @@ class _ChatScreenState extends State<ChatScreen> {
           decoration: BoxDecoration(
             shape: BoxShape.circle,
             color: _recorder.recording
-                ? (_cancelling ? AppColors.muted : const Color(0xFFE5484D))
+                ? (_cancelling ? AppColors.muted : AppColors.danger)
                 : Colors.transparent,
           ),
           child: Icon(
             Icons.mic_rounded,
-            color: _recorder.recording ? Colors.white : AppColors.ink,
+            color: _recorder.recording ? AppColors.onInk : AppColors.ink,
           ),
         ),
       ),

@@ -12,7 +12,6 @@ import '../theme.dart';
 import '../games/challenge.dart';
 import '../widgets/avatar.dart';
 
-/// Figma: "group call page" frames 28:97 (group) and 32:252 (calling Maurice).
 ///
 /// * You in the middle (red ring), people around you, "+" spots to invite.
 /// * While calling one person: their avatar in the middle, the spots pulse,
@@ -441,10 +440,10 @@ class _CallScreenState extends State<CallScreen> with TickerProviderStateMixin {
                 child: InkWell(
                   customBorder: const CircleBorder(),
                   onTap: _invite,
-                  child: const SizedBox(
+                  child: SizedBox(
                     width: 50,
                     height: 50,
-                    child: Icon(Icons.add, size: 22, color: Color(0xFF555555)),
+                    child: Icon(Icons.add, size: 22, color: AppColors.muted),
                   ),
                 ),
               ),
@@ -517,10 +516,10 @@ class _CallScreenState extends State<CallScreen> with TickerProviderStateMixin {
                 _liveVideo(p) ??
                 (video
                     ? Container(
-                        decoration: const BoxDecoration(
+                        decoration: BoxDecoration(
                           shape: BoxShape.circle,
                           gradient: LinearGradient(
-                            colors: [Color(0xFF2B2B2B), Color(0xFF555555)],
+                            colors: [Color(0xFF2B2B2B), AppColors.muted],
                           ),
                         ),
                         child: Icon(
@@ -530,7 +529,7 @@ class _CallScreenState extends State<CallScreen> with TickerProviderStateMixin {
                         ),
                       )
                     : Container(
-                        decoration: const BoxDecoration(
+                        decoration: BoxDecoration(
                           shape: BoxShape.circle,
                           color: AppColors.bubble,
                         ),
@@ -546,7 +545,7 @@ class _CallScreenState extends State<CallScreen> with TickerProviderStateMixin {
               height: size * .26 + 4,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: muted ? const Color(0xFFE5484D) : AppColors.bubble,
+                color: muted ? AppColors.danger : AppColors.bubble,
                 border: Border.all(color: Colors.white, width: 2),
               ),
               child: Icon(
@@ -616,7 +615,7 @@ class _CallScreenState extends State<CallScreen> with TickerProviderStateMixin {
       margin: const EdgeInsets.symmetric(horizontal: 46),
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
       decoration: BoxDecoration(
-        color: const Color(0xFFE6E6E6),
+        color: AppColors.bubble,
         borderRadius: BorderRadius.circular(16),
       ),
       child: Row(
@@ -655,7 +654,7 @@ class _CallScreenState extends State<CallScreen> with TickerProviderStateMixin {
           ),
           child: const Icon(
             Icons.call_end_rounded,
-            color: Color(0xFFE5484D),
+            color: AppColors.danger,
             size: 34,
           ),
         ),

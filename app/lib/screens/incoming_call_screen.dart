@@ -202,7 +202,7 @@ class _IncomingCallScreenState extends State<IncomingCallScreen>
                       _button(
                         Icons.call_end_rounded,
                         'Decline',
-                        const Color(0xFFE5484D),
+                        AppColors.danger,
                         _decline,
                       ),
                       _button(

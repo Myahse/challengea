@@ -70,6 +70,8 @@ class ChatStore extends ChangeNotifier {
     this.me = me;
     nodes.clear();
     spots.clear();
+    stories.clear();
+    myStory = Story(me, []);
     notifyListeners();
   }
 
@@ -112,19 +114,23 @@ class ChatStore extends ChangeNotifier {
   /// Friends who share their location (map page). Positions are in map pixels.
   final List<FriendSpot> spots = [];
 
-  /// Stories from the last 24 h (demo content for now), and mine.
+  /// Stories from the last 24 h, and mine.
   final List<Story> stories = mockStories();
-  late final Story myStory = Story(me, []);
+  late Story myStory = Story(me, []);
 
-  void markStorySeen(Story s) {
-    if (s.seen) return;
-    s.seen = true;
+  /// A story counts as seen once all its slides were shown.
+  void markStorySeen(Story s, StoryItem item) {
+    if (item.seen) return;
+    item.seen = true;
+    s.seen = s.items.every((i) => i.seen);
     notifyListeners();
+    if (!identical(s, myStory)) online?.viewStoryItem(item);
   }
 
   void addToMyStory(StoryItem item) {
     myStory.items.add(item);
     notifyListeners();
+    online?.publishStoryItem(item);
   }
 
   /// My position on the drawn map.

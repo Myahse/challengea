@@ -11,6 +11,7 @@ import '../widgets/avatar.dart';
 import '../widgets/city_map.dart';
 import '../widgets/comments_sheet.dart';
 import '../widgets/fake_video.dart';
+import '../widgets/glass.dart';
 import '../widgets/motion.dart';
 import '../widgets/story_ring.dart';
 import 'create.dart';
@@ -18,63 +19,92 @@ import 'profile_screen.dart';
 import 'story_viewer.dart';
 import 'video_feed.dart';
 
-/// Home: Facebook-style feed with Snapchat-style stories on top.
+/// Home: a calm headline, friends as bubbles, then big tiles for what they
+/// shared, with games and the map between them.
 class HomeFeed extends StatelessWidget {
-  const HomeFeed({
-    super.key,
-    required this.store,
-    required this.onOpenMap,
-    required this.onOpenChats,
-  });
+  const HomeFeed({super.key, required this.store, required this.onOpenMap});
   final ChatStore store;
   final VoidCallback onOpenMap;
-  final VoidCallback onOpenChats;
 
   @override
   Widget build(BuildContext context) {
+    final top = MediaQuery.paddingOf(context).top;
     return ColoredBox(
       color: AppColors.page,
       child: ListenableBuilder(
         listenable: Listenable.merge([store, store.feed]),
         builder: (context, _) {
           final posts = store.feed.home;
-          return CustomScrollView(
-            slivers: [
-              SliverToBoxAdapter(
-                child: _TopBar(store: store, onOpenChats: onOpenChats),
+          final count = posts.length + 2;
+          return Stack(
+            children: [
+              CustomScrollView(
+                slivers: [
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: EdgeInsets.fromLTRB(22, top + 76, 22, 24),
+                      child: FadeSlideIn(
+                        child: Text.rich(
+                          TextSpan(
+                            children: [
+                              const TextSpan(text: 'Your people.\n'),
+                              TextSpan(
+                                text: 'Right now.',
+                                style: tx(
+                                  46,
+                                  weight: FontWeight.w600,
+                                  color: AppColors.muted,
+                                ),
+                              ),
+                            ],
+                          ),
+                          style: tx(46, weight: FontWeight.w600),
+                        ),
+                      ),
+                    ),
+                  ),
+                  SliverToBoxAdapter(
+                    child: FadeSlideIn(
+                      delay: const Duration(milliseconds: 120),
+                      child: _StoriesRow(store: store),
+                    ),
+                  ),
+                  SliverToBoxAdapter(
+                    child: FadeSlideIn(
+                      delay: const Duration(milliseconds: 220),
+                      child: _Composer(store: store),
+                    ),
+                  ),
+                  SliverList.builder(
+                    itemCount: count,
+                    itemBuilder: (context, i) {
+                      if (i >= count - 3) store.feed.loadMore();
+                      // The first post, then games and the map, then the rest.
+                      final slot = posts.isEmpty ? i + 1 : i;
+                      if (slot == 1) return _GamesCard(store: store);
+                      if (slot == 2) {
+                        return _NearbyCard(store: store, onOpenMap: onOpenMap);
+                      }
+                      if (posts.isEmpty) return const _EmptyFeed();
+                      final post = posts[i == 0 ? 0 : i - 2];
+                      return FadeSlideIn(
+                        key: ValueKey(post.id),
+                        delay: Duration(milliseconds: i == 0 ? 320 : 0),
+                        child: PostCard(store: store, post: post),
+                      );
+                    },
+                  ),
+                  const SliverToBoxAdapter(
+                    child: SizedBox(height: 120),
+                  ), // room for the floating menu
+                ],
               ),
-              SliverToBoxAdapter(
-                child: FadeSlideIn(child: _StoriesRow(store: store)),
+              Positioned(
+                left: 0,
+                right: 0,
+                top: 0,
+                child: _TopBar(store: store),
               ),
-              SliverToBoxAdapter(
-                child: FadeSlideIn(
-                  delay: const Duration(milliseconds: 80),
-                  child: _Composer(store: store),
-                ),
-              ),
-              SliverToBoxAdapter(
-                child: FadeSlideIn(
-                  delay: const Duration(milliseconds: 140),
-                  child: _GamesCard(store: store),
-                ),
-              ),
-              SliverToBoxAdapter(
-                child: FadeSlideIn(
-                  delay: const Duration(milliseconds: 200),
-                  child: _NearbyCard(store: store, onOpenMap: onOpenMap),
-                ),
-              ),
-              SliverList.builder(
-                itemCount: posts.length,
-                itemBuilder: (context, i) => FadeSlideIn(
-                  key: ValueKey(posts[i].id),
-                  delay: Duration(milliseconds: i < 4 ? 240 + i * 60 : 0),
-                  child: PostCard(store: store, post: posts[i]),
-                ),
-              ),
-              const SliverToBoxAdapter(
-                child: SizedBox(height: 110),
-              ), // room for the floating menu
             ],
           );
         },
@@ -83,66 +113,72 @@ class HomeFeed extends StatelessWidget {
   }
 }
 
+class _EmptyFeed extends StatelessWidget {
+  const _EmptyFeed();
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.fromLTRB(32, 28, 32, 28),
+    child: Text(
+      'Nothing here yet.\nPost something, or add a friend.',
+      textAlign: TextAlign.center,
+      style: tx(17, color: AppColors.muted),
+    ),
+  );
+}
+
 // ---------------------------------------------------------------- top bar
 class _TopBar extends StatelessWidget {
-  const _TopBar({required this.store, required this.onOpenChats});
+  const _TopBar({required this.store});
   final ChatStore store;
-  final VoidCallback onOpenChats;
 
   @override
   Widget build(BuildContext context) {
-    final unread = store.nodes.where((b) => b.unread > 0).length;
     final requests = store.online?.incoming.length ?? 0;
-    return Container(
-      color: Colors.white,
-      padding: EdgeInsets.fromLTRB(
-        16,
-        MediaQuery.paddingOf(context).top + 8,
-        8,
-        8,
-      ),
-      child: Row(
-        children: [
-          Pressable(
-            onTap: () => ProfileScreen.open(context, store, store.feed.me),
-            child: PersonAvatar(store.me, diameter: 38),
-          ),
-          const SizedBox(width: 10),
-          Flexible(
-            child: FittedBox(
-              fit: BoxFit.scaleDown,
-              alignment: Alignment.centerLeft,
-              child: ShaderMask(
-                shaderCallback: (r) => const LinearGradient(
-                  colors: [Color(0xFF111111), Color(0xFF444444)],
-                ).createShader(r),
+    return Glass(
+      radius: 0,
+      tint: AppColors.page.withValues(alpha: .72),
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(
+          22,
+          MediaQuery.paddingOf(context).top + 4,
+          12,
+          4,
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.centerLeft,
                 child: Text(
                   'Challengea',
-                  style: tx(
-                    26,
-                    weight: FontWeight.w800,
-                    color: Colors.white,
-                  ).copyWith(letterSpacing: -1),
+                  style: tx(20, weight: FontWeight.w600),
                 ),
               ),
             ),
-          ),
-          const Spacer(),
-          _RoundAction(
-            icon: Icons.search_rounded,
-            onTap: () => _soon(context, 'Search'),
-          ),
-          _RoundAction(
-            icon: Icons.notifications_none_rounded,
-            badge: requests,
-            onTap: () => _notifications(context),
-          ),
-          _RoundAction(
-            icon: Icons.chat_bubble_outline_rounded,
-            badge: unread,
-            onTap: onOpenChats,
-          ),
-        ],
+            _BarAction(
+              icon: Icons.search_rounded,
+              label: 'Search',
+              onTap: () => _soon(context, 'Search'),
+            ),
+            _BarAction(
+              icon: Icons.notifications_none_rounded,
+              label: 'Notifications',
+              badge: requests,
+              onTap: () => _notifications(context),
+            ),
+            const SizedBox(width: 6),
+            Tooltip(
+              message: 'My profile',
+              child: Pressable(
+                scale: .9,
+                onTap: () => ProfileScreen.open(context, store, store.feed.me),
+                child: PersonAvatar(store.me, diameter: 34),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -159,17 +195,16 @@ class _TopBar extends StatelessWidget {
     showModalBottomSheet(
       context: context,
       showDragHandle: true,
-      backgroundColor: Colors.white,
       builder: (ctx) => SafeArea(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Padding(
-              padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+              padding: const EdgeInsets.fromLTRB(22, 0, 22, 8),
               child: Text(
                 'Notifications',
-                style: tx(22, weight: FontWeight.w800),
+                style: tx(28, weight: FontWeight.w600),
               ),
             ),
             for (var i = 0; i < items.length; i++)
@@ -185,9 +220,9 @@ class _TopBar extends StatelessWidget {
                       children: [
                         TextSpan(
                           text: items[i].$2,
-                          style: tx(14, weight: FontWeight.w700),
+                          style: tx(15, weight: FontWeight.w600),
                         ),
-                        TextSpan(text: ' ${items[i].$3}', style: tx(14)),
+                        TextSpan(text: ' ${items[i].$3}', style: tx(15)),
                       ],
                     ),
                   ),
@@ -201,29 +236,36 @@ class _TopBar extends StatelessWidget {
   }
 }
 
-class _RoundAction extends StatelessWidget {
-  const _RoundAction({required this.icon, required this.onTap, this.badge = 0});
+class _BarAction extends StatelessWidget {
+  const _BarAction({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+    this.badge = 0,
+  });
   final IconData icon;
+  final String label;
   final VoidCallback onTap;
   final int badge;
 
   @override
   Widget build(BuildContext context) {
-    return Pressable(
-      onTap: onTap,
-      child: Container(
-        width: 40,
-        height: 40,
-        margin: const EdgeInsets.symmetric(horizontal: 4),
-        decoration: const BoxDecoration(
-          shape: BoxShape.circle,
-          color: AppColors.page,
-        ),
-        child: Badge(
-          isLabelVisible: badge > 0,
-          label: Text('$badge'),
-          backgroundColor: const Color(0xFFFF3D7F),
-          child: Icon(icon, size: 22, color: AppColors.ink),
+    return Tooltip(
+      message: label,
+      child: Pressable(
+        scale: .88,
+        onTap: onTap,
+        child: SizedBox(
+          width: 44,
+          height: 44,
+          child: Center(
+            child: Badge(
+              isLabelVisible: badge > 0,
+              label: Text('$badge'),
+              backgroundColor: AppColors.accent,
+              child: Icon(icon, size: 24, color: AppColors.ink),
+            ),
+          ),
         ),
       ),
     );
@@ -250,65 +292,48 @@ class _StoriesRow extends StatelessWidget {
     // Unseen first, like Snapchat.
     final stories = [...store.stories]
       ..sort((a, b) => (a.seen ? 1 : 0) - (b.seen ? 1 : 0));
-    return Container(
-      color: Colors.white,
+    final mine = store.myStory.items.isNotEmpty;
+    return SizedBox(
       height: 118,
-      margin: const EdgeInsets.only(bottom: 8),
       child: ListView(
         scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        padding: const EdgeInsets.fromLTRB(14, 8, 14, 8),
+        clipBehavior: Clip.none,
         children: [
           _StoryTile(
             label: 'Your story',
-            onTap: () => store.myStory.items.isEmpty
-                ? openStoryCreator(context, store)
-                : StoryViewer.open(context, store, [store.myStory], 0),
-            child: Stack(
-              clipBehavior: Clip.none,
-              children: [
-                StoryRing(
-                  person: store.me,
-                  hasStory: store.myStory.items.isNotEmpty,
-                  size: 66,
-                ),
-                Positioned(
-                  right: -2,
-                  bottom: -2,
-                  child: GestureDetector(
-                    onTap: () => openStoryCreator(context, store),
-                    child: Container(
-                      width: 24,
-                      height: 24,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        gradient: const LinearGradient(
-                          colors: AppColors.brandGradient,
-                        ),
-                        border: Border.all(color: Colors.white, width: 2),
-                      ),
-                      child: const Icon(
-                        Icons.add_rounded,
-                        size: 16,
-                        color: Colors.white,
-                      ),
+            muted: true,
+            onTap: () => mine
+                ? StoryViewer.open(context, store, [store.myStory], 0)
+                : openStoryCreator(context, store),
+            child: mine
+                ? StoryRing(person: store.me, size: 68)
+                : Container(
+                    width: 68,
+                    height: 68,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: AppColors.card,
+                      border: Border.all(color: AppColors.line),
+                    ),
+                    child: Icon(
+                      Icons.add_rounded,
+                      size: 26,
+                      color: AppColors.accent,
                     ),
                   ),
-                ),
-              ],
-            ),
           ),
           for (var i = 0; i < stories.length; i++)
             FadeSlideIn(
-              delay: Duration(milliseconds: 60 * i),
-              offset: const Offset(30, 0),
-              scale: .8,
+              delay: Duration(milliseconds: 70 * i),
+              offset: const Offset(28, 0),
               child: _StoryTile(
                 label: stories[i].person.firstName,
                 onTap: () => StoryViewer.open(context, store, stories, i),
                 child: StoryRing(
                   person: stories[i].person,
                   seen: stories[i].seen,
-                  size: 66,
+                  size: 68,
                 ),
               ),
             ),
@@ -323,26 +348,28 @@ class _StoryTile extends StatelessWidget {
     required this.label,
     required this.child,
     required this.onTap,
+    this.muted = false,
   });
   final String label;
   final Widget child;
   final VoidCallback onTap;
+  final bool muted;
 
   @override
   Widget build(BuildContext context) {
     return Pressable(
       onTap: onTap,
       child: SizedBox(
-        width: 78,
+        width: 84,
         child: Column(
           children: [
             child,
-            const SizedBox(height: 6),
+            const SizedBox(height: 8),
             Text(
               label,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: tx(12, weight: FontWeight.w500),
+              style: tx(12, color: muted ? AppColors.muted : AppColors.ink),
             ),
           ],
         ),
@@ -358,106 +385,54 @@ class _Composer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      color: Colors.white,
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.fromLTRB(14, 12, 14, 6),
-      child: Column(
-        children: [
-          Row(
-            children: [
-              PersonAvatar(store.me, diameter: 40),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Pressable(
-                  scale: .98,
-                  onTap: () => openPostComposer(context, store),
-                  child: Container(
-                    height: 42,
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 4, 12, 12),
+      child: Container(
+        height: 58,
+        padding: const EdgeInsets.only(left: 20, right: 6),
+        decoration: BoxDecoration(
+          color: AppColors.card,
+          borderRadius: BorderRadius.circular(29),
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: Pressable(
+                scale: .98,
+                onTap: () => openPostComposer(context, store),
+                child: SizedBox.expand(
+                  child: Align(
                     alignment: Alignment.centerLeft,
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(22),
-                      border: Border.all(color: AppColors.line),
-                    ),
                     child: Text(
-                      'What’s on your mind, ${store.me.firstName}?',
-                      style: tx(15, color: AppColors.muted),
+                      'What’s on your mind?',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: tx(16, color: AppColors.muted),
                     ),
                   ),
                 ),
               ),
-            ],
-          ),
-          const Divider(height: 18, color: AppColors.line),
-          Row(
-            children: [
-              _ComposerChip(
-                icon: Icons.photo_library_rounded,
-                color: const Color(0xFF45BD62),
-                label: 'Photo',
-                onTap: () => openPostComposer(context, store, pickPhoto: true),
-              ),
-              _ComposerChip(
-                icon: Icons.auto_awesome_rounded,
-                color: const Color(0xFFFF3D7F),
-                label: 'Story',
-                onTap: () => openStoryCreator(context, store),
-              ),
-              _ComposerChip(
-                icon: Icons.sports_esports_rounded,
-                color: const Color(0xFF8B6CF6),
-                label: 'Challenge',
-                onTap: () => challengeWithGame(context, store, fourInRow),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _ComposerChip extends StatelessWidget {
-  const _ComposerChip({
-    required this.icon,
-    required this.color,
-    required this.label,
-    required this.onTap,
-  });
-  final IconData icon;
-  final Color color;
-  final String label;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) => Expanded(
-    child: Pressable(
-      onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 8),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, color: color, size: 22),
-            const SizedBox(width: 6),
-            Flexible(
-              child: Text(
-                label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: tx(
-                  14,
-                  weight: FontWeight.w600,
-                  color: const Color(0xFF555555),
-                ),
-              ),
+            ),
+            _BarAction(
+              icon: Icons.photo_outlined,
+              label: 'Photo',
+              onTap: () => openPostComposer(context, store, pickPhoto: true),
+            ),
+            _BarAction(
+              icon: Icons.auto_awesome_outlined,
+              label: 'Story',
+              onTap: () => openStoryCreator(context, store),
+            ),
+            _BarAction(
+              icon: Icons.sports_esports_outlined,
+              label: 'Challenge',
+              onTap: () => challengeWithGame(context, store, fourInRow),
             ),
           ],
         ),
       ),
-    ),
-  );
+    );
+  }
 }
 
 // ------------------------------------------------------------------ games
@@ -467,101 +442,90 @@ class _GamesCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      color: Colors.white,
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.fromLTRB(0, 14, 0, 14),
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(0, 20, 0, 24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Row(
+            padding: const EdgeInsets.symmetric(horizontal: 22),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Icon(Icons.auto_awesome, size: 20),
-                const SizedBox(width: 6),
-                Text('Tales', style: tx(17, weight: FontWeight.w800)),
-                const SizedBox(width: 6),
-                Flexible(
-                  child: Text(
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    '· challenge a friend',
-                    style: tx(13, color: AppColors.muted),
-                  ),
+                Text('Tales', style: tx(34, weight: FontWeight.w600)),
+                const SizedBox(height: 2),
+                Text(
+                  'Challenge a friend.',
+                  style: tx(17, color: AppColors.muted),
                 ),
               ],
             ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 14),
           SizedBox(
-            height: 128,
+            height: 176,
             child: ListView.separated(
               scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 16),
+              padding: const EdgeInsets.symmetric(horizontal: 12),
               itemCount: allGames.length,
               separatorBuilder: (_, _) => const SizedBox(width: 10),
               itemBuilder: (context, i) {
                 final g = allGames[i];
-                return Pressable(
-                  onTap: () => challengeWithGame(context, store, g),
-                  child: Container(
-                    width: 112,
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(20),
-                      gradient: LinearGradient(
-                        colors: g.colors,
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
+                return FadeSlideIn(
+                  delay: Duration(milliseconds: 70 * i),
+                  offset: const Offset(28, 0),
+                  child: Pressable(
+                    onTap: () => challengeWithGame(context, store, g),
+                    child: Container(
+                      width: 148,
+                      clipBehavior: Clip.antiAlias,
+                      decoration: BoxDecoration(
+                        color: AppColors.hero,
+                        borderRadius: BorderRadius.circular(26),
                       ),
-                    ),
-                    padding: const EdgeInsets.all(12),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Icon(g.icon, color: Colors.white, size: 30),
-                            const Spacer(),
-                            if (!g.playable)
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 6,
-                                  vertical: 2,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: Colors.black26,
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: Text(
-                                  'soon',
+                      child: Stack(
+                        children: [
+                          Positioned(
+                            right: -44,
+                            bottom: -44,
+                            child: Orb(
+                              color: g.colors.first,
+                              diameter: 136,
+                              glow: 40,
+                            ),
+                          ),
+                          Positioned(
+                            right: 8,
+                            bottom: 8,
+                            child: Icon(g.icon, color: Colors.white, size: 26),
+                          ),
+                          Padding(
+                            padding: const EdgeInsets.all(16),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  g.name,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
                                   style: tx(
-                                    10,
-                                    weight: FontWeight.w700,
-                                    color: Colors.white,
+                                    20,
+                                    weight: FontWeight.w600,
+                                    color: AppColors.nightInk,
                                   ),
                                 ),
-                              ),
-                          ],
-                        ),
-                        const Spacer(),
-                        Text(
-                          g.name,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: tx(
-                            15,
-                            weight: FontWeight.w800,
-                            color: Colors.white,
+                                const SizedBox(height: 2),
+                                Text(
+                                  g.playable ? '1 vs 1' : 'Coming soon',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: tx(13, color: AppColors.nightMuted),
+                                ),
+                              ],
+                            ),
                           ),
-                        ),
-                        Text(
-                          g.playable ? '1 vs 1' : 'Coming soon',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: tx(11, color: Colors.white70),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
                 );
@@ -584,17 +548,15 @@ class _NearbyCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final spots = store.spots.where((s) => s.online).take(4).toList();
     if (spots.isEmpty) return const SizedBox.shrink();
-    return Container(
-      color: Colors.white,
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.all(14),
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
       child: Pressable(
         scale: .98,
         onTap: onOpenMap,
         child: ClipRRect(
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(30),
           child: SizedBox(
-            height: 150,
+            height: 220,
             child: LayoutBuilder(
               builder: (context, box) => Stack(
                 children: [
@@ -606,55 +568,53 @@ class _NearbyCard extends StatelessWidget {
                       ),
                     ),
                   ),
-                  for (final s in spots)
+                  for (var i = 0; i < spots.length; i++)
                     Positioned(
                       left:
                           (box.maxWidth / 2 +
-                                  (s.position.dx - store.myPosition.dx) * .32 -
-                                  18)
-                              .clamp(6.0, box.maxWidth - 42),
+                                  (spots[i].position.dx - store.myPosition.dx) *
+                                      .32 -
+                                  21)
+                              .clamp(6.0, box.maxWidth - 48),
                       top:
-                          (75 +
-                                  (s.position.dy - store.myPosition.dy) * .32 -
-                                  18)
-                              .clamp(6.0, 60.0),
-                      child: PersonAvatar(s.person, diameter: 36, border: 2.5),
+                          (84 +
+                                  (spots[i].position.dy - store.myPosition.dy) *
+                                      .32 -
+                                  21)
+                              .clamp(10.0, 100.0),
+                      child: Floaty(
+                        phase: i * .23,
+                        child: PersonAvatar(spots[i].person, diameter: 42),
+                      ),
                     ),
                   Positioned(
-                    left: 12,
-                    bottom: 12,
-                    right: 12,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 14,
-                        vertical: 10,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                      child: Row(
-                        children: [
-                          const Icon(
-                            Icons.location_on_rounded,
-                            color: Color(0xFFFF3D7F),
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              '${spots.length} friends nearby',
-                              style: tx(15, weight: FontWeight.w700),
+                    left: 10,
+                    right: 10,
+                    bottom: 10,
+                    child: Glass(
+                      radius: 22,
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 6,
+                        ),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                '${spots.length} friends nearby',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: tx(17, weight: FontWeight.w600),
+                              ),
                             ),
-                          ),
-                          Text(
-                            'Open map',
-                            style: tx(
-                              13,
-                              weight: FontWeight.w700,
-                              color: AppColors.like,
+                            TextLink(
+                              label: 'Open map',
+                              size: 15,
+                              onTap: onOpenMap,
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
                     ),
                   ),
@@ -669,7 +629,8 @@ class _NearbyCard extends StatelessWidget {
 }
 
 // ------------------------------------------------------------------- posts
-/// A post in the home feed: who, text, photo/video, reactions, comment, share.
+/// A post as one big tile. Short text cards go black and centered with a
+/// glossy bubble rising from the bottom; everything else sits on white.
 class PostCard extends StatelessWidget {
   const PostCard({super.key, required this.store, required this.post});
   final ChatStore store;
@@ -677,146 +638,152 @@ class PostCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final a = post.author;
-    final feed = store.feed;
+    final dark = post.textCard;
     return Container(
-      color: Colors.white,
-      margin: const EdgeInsets.only(bottom: 8),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(14, 12, 6, 8),
-            child: Row(
-              children: [
-                Pressable(
-                  onTap: () => ProfileScreen.open(context, store, a),
-                  child: PersonAvatar(a.person, diameter: 42),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        a.person.name,
-                        style: tx(15, weight: FontWeight.w700),
-                      ),
-                      Row(
-                        children: [
-                          Text(
-                            '${post.ago} · ',
-                            style: tx(12, color: AppColors.muted),
-                          ),
-                          Icon(
-                            post.live
-                                ? Icons.sensors_rounded
-                                : Icons.public_rounded,
-                            size: 13,
-                            color: post.live
-                                ? const Color(0xFFE5484D)
-                                : AppColors.muted,
-                          ),
-                          if (post.live)
-                            Text(
-                              ' LIVE',
-                              style: tx(
-                                11,
-                                weight: FontWeight.w800,
-                                color: const Color(0xFFE5484D),
-                              ),
-                            ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-                IconButton(
-                  onPressed: () => _soon(context, 'Post options'),
-                  icon: const Icon(Icons.more_horiz),
-                ),
-              ],
-            ),
+      margin: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+      clipBehavior: Clip.antiAlias,
+      decoration: BoxDecoration(
+        color: dark ? AppColors.hero : AppColors.card,
+        borderRadius: BorderRadius.circular(30),
+      ),
+      child: dark ? _hero(context) : _plain(context),
+    );
+  }
+
+  String get _counts {
+    final parts = [
+      '${compact(post.likes)} ${post.likes == 1 ? 'like' : 'likes'}',
+      if (post.commentCount > 0)
+        '${compact(post.commentCount)} ${post.commentCount == 1 ? 'comment' : 'comments'}',
+      if (post.shares > 0) '${compact(post.shares)} shares',
+    ];
+    return parts.join(' · ');
+  }
+
+  Widget _byline(BuildContext context, {required bool dark}) {
+    final a = post.author;
+    final muted = dark ? AppColors.nightMuted : AppColors.muted;
+    return Row(
+      mainAxisSize: dark ? MainAxisSize.min : MainAxisSize.max,
+      children: [
+        if (!dark) ...[
+          Pressable(
+            onTap: () => ProfileScreen.open(context, store, a),
+            child: PersonAvatar(a.person, diameter: 40),
           ),
-          if (post.caption.isNotEmpty && !post.textCard)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(14, 0, 14, 10),
-              child: Text.rich(
-                TextSpan(
-                  children: [
-                    for (final w
-                        in '${post.caption} ${post.tags.join(' ')}'
-                            .trim()
-                            .split(' '))
-                      TextSpan(
-                        text: '$w ',
-                        style: w.startsWith('@') || w.startsWith('#')
-                            ? tx(
-                                15,
-                                weight: FontWeight.w600,
-                                color: AppColors.like,
-                              )
-                            : tx(15),
+          const SizedBox(width: 10),
+        ],
+        Flexible(
+          fit: dark ? FlexFit.loose : FlexFit.tight,
+          child: GestureDetector(
+            onTap: () => ProfileScreen.open(context, store, a),
+            child: Text.rich(
+              TextSpan(
+                children: [
+                  TextSpan(
+                    text: a.person.name,
+                    style: tx(
+                      15,
+                      weight: FontWeight.w600,
+                      color: dark ? AppColors.nightInk : AppColors.ink,
+                    ),
+                  ),
+                  TextSpan(
+                    text: ' · ${post.ago}',
+                    style: tx(15, color: muted),
+                  ),
+                  if (post.live)
+                    TextSpan(
+                      text: ' · Live',
+                      style: tx(
+                        15,
+                        weight: FontWeight.w600,
+                        color: AppColors.danger,
                       ),
-                  ],
-                ),
+                    ),
+                ],
               ),
-            ),
-          _media(context),
-          // Counts.
-          Padding(
-            padding: const EdgeInsets.fromLTRB(14, 10, 14, 6),
-            child: Row(
-              children: [
-                _ReactionStack(post: post),
-                const SizedBox(width: 6),
-                AnimatedSwitcher(
-                  duration: Motion.fast,
-                  child: Text(
-                    compact(post.likes),
-                    key: ValueKey(post.likes),
-                    style: tx(13, color: AppColors.muted),
-                  ),
-                ),
-                const Spacer(),
-                Flexible(
-                  child: Text(
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    '${compact(post.commentCount)} comments · ${compact(post.shares)} shares',
-                    style: tx(13, color: AppColors.muted),
-                  ),
-                ),
-              ],
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
           ),
-          const Divider(
-            height: 1,
-            indent: 14,
-            endIndent: 14,
-            color: AppColors.line,
+        ),
+        IconButton(
+          tooltip: 'Post options',
+          onPressed: () => _soon(context, 'Post options'),
+          icon: Icon(Icons.more_horiz, color: muted),
+        ),
+      ],
+    );
+  }
+
+  Widget _links(BuildContext context, {required bool dark}) {
+    final feed = store.feed;
+    return Wrap(
+      alignment: dark ? WrapAlignment.center : WrapAlignment.start,
+      spacing: 20,
+      children: [
+        ReactionButton(post: post, feed: feed, dark: dark),
+        TextLink(
+          label: 'Reply',
+          dark: dark,
+          chevron: false,
+          onTap: () => showComments(context, feed, post),
+        ),
+        TextLink(
+          label: 'Share',
+          dark: dark,
+          chevron: false,
+          onTap: () => _share(context),
+        ),
+        if (!post.author.isMe)
+          TextLink(
+            label: 'Challenge',
+            dark: dark,
+            chevron: false,
+            onTap: () => challengeFriend(context, store, post.author.person),
+          ),
+      ],
+    );
+  }
+
+  /// Black tile: the words are the picture.
+  Widget _hero(BuildContext context) {
+    final n = post.caption.length;
+    final size = n <= 44 ? 38.0 : (n <= 90 ? 30.0 : 24.0);
+    final ball = post.shownColors.first;
+    return GestureDetector(
+      onDoubleTap: () => _doubleTap(),
+      child: Stack(
+        alignment: Alignment.bottomCenter,
+        children: [
+          Positioned(
+            bottom: -112,
+            child: Floaty(
+              distance: 8,
+              seconds: 7,
+              child: Orb(color: ball, diameter: 240, glow: 80),
+            ),
           ),
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-            child: Row(
+            padding: const EdgeInsets.fromLTRB(22, 14, 22, 0),
+            child: Column(
               children: [
-                Expanded(
-                  child: ReactionButton(post: post, feed: feed),
-                ),
-                Expanded(
-                  child: _Action(
-                    icon: Icons.mode_comment_outlined,
-                    label: 'Comment',
-                    onTap: () => showComments(context, feed, post),
+                _byline(context, dark: true),
+                const SizedBox(height: 6),
+                Text(
+                  post.caption,
+                  textAlign: TextAlign.center,
+                  style: tx(
+                    size,
+                    weight: FontWeight.w600,
+                    color: AppColors.nightInk,
                   ),
                 ),
-                Expanded(
-                  child: _Action(
-                    icon: Icons.near_me_outlined,
-                    label: 'Share',
-                    onTap: () => _share(context),
-                  ),
-                ),
+                const SizedBox(height: 10),
+                _links(context, dark: true),
+                Text(_counts, style: tx(14, color: AppColors.nightMuted)),
+                const SizedBox(height: 152),
               ],
             ),
           ),
@@ -825,99 +792,151 @@ class PostCard extends StatelessWidget {
     );
   }
 
-  Widget _media(BuildContext context) {
-    if (post.textCard) {
-      return AspectRatio(
-        aspectRatio: 1.25,
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: post.colors,
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
+  void _doubleTap() {
+    HapticFeedback.lightImpact();
+    if (post.reaction == null) store.feed.react(post, '❤️');
+  }
+
+  Widget _plain(BuildContext context) {
+    final media = _media(context);
+    final hasMedia = media != null;
+    final short = !hasMedia && post.caption.length <= 90;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(14, 12, 6, 6),
+          child: _byline(context, dark: false),
+        ),
+        if (post.caption.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 2, 20, 12),
+            child: Text.rich(
+              TextSpan(
+                children: [
+                  for (final w
+                      in '${post.caption} ${post.tags.join(' ')}'.trim().split(
+                        ' ',
+                      ))
+                    TextSpan(
+                      text: '$w ',
+                      style: tx(
+                        short ? 26 : 17,
+                        weight: short ? FontWeight.w600 : FontWeight.w400,
+                        color: w.startsWith('@') || w.startsWith('#')
+                            ? AppColors.link
+                            : AppColors.ink,
+                      ),
+                    ),
+                ],
+              ),
             ),
           ),
-          child: Center(
-            child: Padding(
-              padding: const EdgeInsets.all(28),
-              child: Text(
-                post.caption,
-                textAlign: TextAlign.center,
-                style: tx(28, weight: FontWeight.w800, color: Colors.white),
+        ?media,
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+          child: Text(_counts, style: tx(14, color: AppColors.muted)),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 0, 20, 6),
+          child: _links(context, dark: false),
+        ),
+      ],
+    );
+  }
+
+  Widget? _media(BuildContext context) {
+    if (post.image != null) {
+      return GestureDetector(
+        onDoubleTap: _doubleTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(22),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxHeight: 520),
+              child: Image(
+                image: post.image!,
+                fit: BoxFit.cover,
+                width: double.infinity,
               ),
             ),
           ),
         ),
       );
     }
-    if (post.photo != null) {
-      return ConstrainedBox(
-        constraints: const BoxConstraints(maxHeight: 520),
-        child: Image.memory(
-          post.photo!,
-          fit: BoxFit.cover,
-          width: double.infinity,
-        ),
-      );
-    }
-    if (post.colors.isEmpty) return const SizedBox.shrink();
+    if (post.colors.isEmpty) return null;
     final video = post.kind == PostKind.video;
     return GestureDetector(
       onTap: video ? () => VideoFeed.open(context, store, [post], 0) : null,
-      onDoubleTap: () {
-        HapticFeedback.lightImpact();
-        if (post.reaction == null) store.feed.react(post, '❤️');
-      },
-      child: AspectRatio(
-        aspectRatio: video ? 4 / 5 : 1,
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            FakeVideo(post: post, t: (post.id.hashCode % 100) / 100),
-            if (video)
-              Center(
-                child: Container(
-                  width: 64,
-                  height: 64,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: Colors.black.withValues(alpha: .35),
-                  ),
-                  child: const Icon(
-                    Icons.play_arrow_rounded,
-                    color: Colors.white,
-                    size: 40,
-                  ),
-                ),
-              ),
-            if (video && post.music.isNotEmpty)
-              Positioned(
-                left: 12,
-                bottom: 12,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 6,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Colors.black45,
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(
-                        Icons.music_note_rounded,
-                        color: Colors.white,
-                        size: 14,
+      onDoubleTap: _doubleTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(22),
+          child: AspectRatio(
+            aspectRatio: video ? 4 / 5 : 1,
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                FakeVideo(post: post, t: (post.id.hashCode % 100) / 100),
+                if (video)
+                  Center(
+                    child: Glass(
+                      radius: 32,
+                      dark: true,
+                      child: const SizedBox(
+                        width: 64,
+                        height: 64,
+                        child: Icon(
+                          Icons.play_arrow_rounded,
+                          color: Colors.white,
+                          size: 36,
+                        ),
                       ),
-                      const SizedBox(width: 4),
-                      Text(post.music, style: tx(12, color: Colors.white)),
-                    ],
+                    ),
                   ),
-                ),
-              ),
-          ],
+                if (video && post.music.isNotEmpty)
+                  Positioned(
+                    left: 10,
+                    bottom: 10,
+                    right: 10,
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: Glass(
+                        radius: 16,
+                        dark: true,
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 7,
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(
+                                Icons.music_note_rounded,
+                                color: Colors.white,
+                                size: 14,
+                              ),
+                              const SizedBox(width: 4),
+                              Flexible(
+                                child: Text(
+                                  post.music,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: tx(13, color: Colors.white),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
         ),
       ),
     );
@@ -928,15 +947,14 @@ class PostCard extends StatelessWidget {
     showModalBottomSheet(
       context: context,
       showDragHandle: true,
-      backgroundColor: Colors.white,
       builder: (ctx) => SafeArea(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Padding(
-              padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
-              child: Text('Send to', style: tx(20, weight: FontWeight.w800)),
+              padding: const EdgeInsets.fromLTRB(22, 0, 22, 12),
+              child: Text('Send to', style: tx(28, weight: FontWeight.w600)),
             ),
             SizedBox(
               height: 96,
@@ -987,59 +1005,27 @@ class PostCard extends StatelessWidget {
   }
 }
 
-class _Action extends StatelessWidget {
-  const _Action({required this.icon, required this.label, required this.onTap});
-  final IconData icon;
-  final String label;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) => Pressable(
-    onTap: onTap,
-    child: Padding(
-      padding: const EdgeInsets.symmetric(vertical: 10),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(icon, size: 20, color: const Color(0xFF555555)),
-          const SizedBox(width: 6),
-          Text(
-            label,
-            style: tx(
-              14,
-              weight: FontWeight.w600,
-              color: const Color(0xFF555555),
-            ),
-          ),
-        ],
-      ),
-    ),
-  );
-}
-
 const _reactions = ['👍', '❤️', '😂', '😮', '😢', '😡'];
 const _reactionNames = {
-  '👍': 'Like',
-  '❤️': 'Love',
+  '👍': 'Liked',
+  '❤️': 'Loved',
   '😂': 'Haha',
   '😮': 'Wow',
   '😢': 'Sad',
   '😡': 'Angry',
 };
-const _reactionColors = {
-  '👍': AppColors.like,
-  '❤️': Color(0xFFF33E58),
-  '😂': Color(0xFFF7B125),
-  '😮': Color(0xFFF7B125),
-  '😢': Color(0xFFF7B125),
-  '😡': Color(0xFFE9710F),
-};
 
-/// Like button: tap = 👍, long-press = pick a reaction (they pop up in a row).
+/// Like link: tap = 👍, long-press = pick a reaction (they rise in a row).
 class ReactionButton extends StatefulWidget {
-  const ReactionButton({super.key, required this.post, required this.feed});
+  const ReactionButton({
+    super.key,
+    required this.post,
+    required this.feed,
+    this.dark = false,
+  });
   final Post post;
   final FeedData feed;
+  final bool dark;
 
   @override
   State<ReactionButton> createState() => _ReactionButtonState();
@@ -1066,48 +1052,49 @@ class _ReactionButtonState extends State<ReactionButton> {
               8.0,
               MediaQuery.sizeOf(context).width - 316,
             ),
-            top: origin.dy - 64,
+            top: origin.dy - 68,
             child: FadeSlideIn(
               duration: Motion.normal,
               offset: const Offset(0, 16),
-              scale: .7,
+              scale: .8,
               child: Material(
-                elevation: 8,
-                shadowColor: Colors.black26,
-                borderRadius: BorderRadius.circular(32),
-                color: Colors.white,
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 6,
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      for (var i = 0; i < _reactions.length; i++)
-                        FadeSlideIn(
-                          delay: Duration(milliseconds: 30 * i),
-                          offset: const Offset(0, 20),
-                          scale: .3,
-                          duration: const Duration(milliseconds: 380),
-                          child: Pressable(
-                            scale: 1.3,
-                            onTap: () {
-                              widget.feed.react(widget.post, _reactions[i]);
-                              _close();
-                            },
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 5,
-                              ),
-                              child: Text(
-                                _reactions[i],
-                                style: const TextStyle(fontSize: 34),
+                type: MaterialType.transparency,
+                child: Glass(
+                  radius: 30,
+                  shadow: true,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 6,
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        for (var i = 0; i < _reactions.length; i++)
+                          FadeSlideIn(
+                            delay: Duration(milliseconds: 30 * i),
+                            offset: const Offset(0, 20),
+                            scale: .5,
+                            duration: Motion.normal,
+                            child: Pressable(
+                              scale: 1.25,
+                              onTap: () {
+                                widget.feed.react(widget.post, _reactions[i]);
+                                _close();
+                              },
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 5,
+                                ),
+                                child: Text(
+                                  _reactions[i],
+                                  style: const TextStyle(fontSize: 34),
+                                ),
                               ),
                             ),
                           ),
-                        ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
               ),
@@ -1133,82 +1120,42 @@ class _ReactionButtonState extends State<ReactionButton> {
   @override
   Widget build(BuildContext context) {
     final r = widget.post.reaction;
-    final color = r == null ? const Color(0xFF555555) : _reactionColors[r]!;
-    return GestureDetector(
-      onLongPress: _open,
-      child: Pressable(
+    final color = widget.dark ? AppColors.nightLink : AppColors.link;
+    return Semantics(
+      button: true,
+      label: r == null ? 'Like' : _reactionNames[r],
+      excludeSemantics: true,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onLongPress: _open,
         onTap: () => widget.feed.react(widget.post, r ?? '👍'),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 10),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: 44),
           child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisSize: MainAxisSize.min,
             children: [
               AnimatedSwitcher(
-                duration: const Duration(milliseconds: 450),
+                duration: Motion.normal,
+                switchInCurve: Motion.ease,
                 transitionBuilder: (c, a) => ScaleTransition(
-                  scale: CurvedAnimation(parent: a, curve: Curves.elasticOut),
-                  child: c,
+                  scale: Tween(begin: .4, end: 1.0).animate(a),
+                  child: FadeTransition(opacity: a, child: c),
                 ),
                 child: r == null
-                    ? const Icon(
-                        Icons.thumb_up_alt_outlined,
-                        size: 20,
-                        color: Color(0xFF555555),
-                        key: ValueKey('none'),
-                      )
-                    : Text(
-                        r,
+                    ? const SizedBox(key: ValueKey('none'))
+                    : Padding(
                         key: ValueKey(r),
-                        style: const TextStyle(fontSize: 19),
+                        padding: const EdgeInsets.only(right: 5),
+                        child: Text(r, style: const TextStyle(fontSize: 17)),
                       ),
               ),
-              const SizedBox(width: 6),
               Text(
                 r == null ? 'Like' : _reactionNames[r]!,
-                style: tx(14, weight: FontWeight.w600, color: color),
+                style: tx(16, color: color),
               ),
             ],
           ),
         ),
-      ),
-    );
-  }
-}
-
-/// The little pile of reaction emojis next to the count.
-class _ReactionStack extends StatelessWidget {
-  const _ReactionStack({required this.post});
-  final Post post;
-
-  @override
-  Widget build(BuildContext context) {
-    final shown = <String>{
-      if (post.reaction != null) post.reaction!,
-      '👍',
-      '❤️',
-      if (post.likes > 500) '😂',
-    }.take(3).toList();
-    return SizedBox(
-      width: 14.0 * shown.length + 8,
-      height: 22,
-      child: Stack(
-        children: [
-          for (var i = 0; i < shown.length; i++)
-            Positioned(
-              left: i * 14.0,
-              child: Container(
-                width: 22,
-                height: 22,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: Colors.white,
-                  border: Border.all(color: Colors.white, width: 1.5),
-                ),
-                child: Text(shown[i], style: const TextStyle(fontSize: 13)),
-              ),
-            ),
-        ],
       ),
     );
   }

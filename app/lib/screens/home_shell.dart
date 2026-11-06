@@ -1,10 +1,10 @@
-import 'dart:ui' show ImageFilter;
-
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../chat_store.dart';
 import '../games/challenge.dart';
 import '../games/games.dart';
+import '../widgets/glass.dart';
 import '../widgets/motion.dart';
 import '../theme.dart';
 import 'chat_home.dart';
@@ -103,55 +103,55 @@ class _HomeShellState extends State<HomeShell> {
   Widget build(BuildContext context) {
     final store = widget.store;
     final onDark = _page == _videos;
+    final darkBars = onDark || AppColors.dark;
     final inset = MediaQuery.paddingOf(context).bottom;
-    return Scaffold(
-      backgroundColor: onDark ? Colors.black : AppColors.page,
-      body: Stack(
-        children: [
-          PageView(
-            controller: _pages,
-            // Tabs change from the menu (each page owns its drags: bubbles, map, videos).
-            physics: const NeverScrollableScrollPhysics(),
-            onPageChanged: (p) => setState(() => _page = p),
-            children: [
-              HomeFeed(
-                store: store,
-                onOpenMap: () => _go(_map),
-                onOpenChats: () => _go(_chats),
-              ),
-              ChatHome(store: store, onOpenMap: () => _go(_map)),
-              VideoFeed(
-                store: store,
-                posts: store.feed.forYou,
-                following: store.feed.following(
-                  store.friends.map((f) => f.id).toSet(),
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: darkBars ? SystemUiOverlayStyle.light : SystemUiOverlayStyle.dark,
+      child: Scaffold(
+        backgroundColor: onDark ? AppColors.night : AppColors.page,
+        body: Stack(
+          children: [
+            PageView(
+              controller: _pages,
+              // Tabs change from the menu (each page owns its drags: bubbles, map, videos).
+              physics: const NeverScrollableScrollPhysics(),
+              onPageChanged: (p) => setState(() => _page = p),
+              children: [
+                HomeFeed(store: store, onOpenMap: () => _go(_map)),
+                ChatHome(store: store, onOpenMap: () => _go(_map)),
+                VideoFeed(
+                  store: store,
+                  posts: store.feed.forYou,
+                  following: store.feed.following(
+                    store.friends.map((f) => f.id).toSet(),
+                  ),
+                  active: _page == _videos,
                 ),
-                active: _page == _videos,
-              ),
-              MapScreen(store: store),
-            ],
-          ),
-          Positioned(
-            left: 14,
-            right: 14,
-            bottom: inset + 10,
-            child: ListenableBuilder(
-              listenable: store,
-              builder: (context, _) => _BottomNav(
-                index: _menuOf(_page),
-                onDark: onDark,
-                unread: store.nodes.where((n) => n.unread > 0).length,
-                onSelect: _onMenu,
+                MapScreen(store: store),
+              ],
+            ),
+            Positioned(
+              left: 22,
+              right: 22,
+              bottom: inset + 12,
+              child: ListenableBuilder(
+                listenable: store,
+                builder: (context, _) => _BottomNav(
+                  index: _menuOf(_page),
+                  onDark: onDark,
+                  unread: store.nodes.where((n) => n.unread > 0).length,
+                  onSelect: _onMenu,
+                ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
 }
 
-/// Floating, frosted menu with a gradient create button in the middle.
+/// Floating glass menu. A soft pill slides to the page you are on.
 class _BottomNav extends StatelessWidget {
   const _BottomNav({
     required this.index,
@@ -167,130 +167,102 @@ class _BottomNav extends StatelessWidget {
 
   static const _items = <(IconData, IconData, String)>[
     (Icons.home_outlined, Icons.home_rounded, 'Home'),
-    (Icons.chat_bubble_outline_rounded, Icons.chat_bubble_rounded, 'Chats'),
-    (Icons.add, Icons.add, ''),
+    (Icons.bubble_chart_outlined, Icons.bubble_chart_rounded, 'Chats'),
+    (Icons.add_rounded, Icons.add_rounded, 'Create'),
     (Icons.smart_display_outlined, Icons.smart_display_rounded, 'Videos'),
     (Icons.explore_outlined, Icons.explore_rounded, 'Map'),
   ];
 
   @override
   Widget build(BuildContext context) {
-    final fg = onDark ? Colors.white : AppColors.ink;
-    final muted = onDark ? Colors.white60 : const Color(0xFF7A7A7A);
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(30),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
-        child: AnimatedContainer(
-          duration: Motion.normal,
-          height: 66,
-          decoration: BoxDecoration(
-            color: onDark
-                ? Colors.black.withValues(alpha: .35)
-                : Colors.white.withValues(alpha: .82),
-            borderRadius: BorderRadius.circular(30),
-            border: Border.all(
-              color: onDark
-                  ? Colors.white12
-                  : Colors.black.withValues(alpha: .05),
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: .08),
-                blurRadius: 24,
-                offset: const Offset(0, 8),
-              ),
-            ],
-          ),
-          child: Row(
-            children: [
-              for (var i = 0; i < _items.length; i++)
-                Expanded(
-                  child: i == 2
-                      ? Center(
-                          child: Pressable(
-                            scale: .85,
-                            onTap: () => onSelect(2),
-                            child: Container(
-                              width: 50,
-                              height: 40,
-                              decoration: BoxDecoration(
-                                borderRadius: BorderRadius.circular(14),
-                                gradient: const LinearGradient(
-                                  colors: AppColors.brandGradient,
-                                ),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: const Color(
-                                      0xFFFF3D7F,
-                                    ).withValues(alpha: .35),
-                                    blurRadius: 12,
-                                    offset: const Offset(0, 4),
-                                  ),
-                                ],
-                              ),
-                              child: const Icon(
-                                Icons.add_rounded,
-                                color: Colors.white,
-                                size: 30,
-                              ),
-                            ),
-                          ),
-                        )
-                      : Pressable(
-                          onTap: () => onSelect(i),
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              AnimatedScale(
-                                scale: i == index ? 1.12 : 1,
-                                duration: Motion.normal,
-                                curve: Curves.easeOutBack,
-                                child: Badge(
-                                  isLabelVisible: i == 1 && unread > 0,
-                                  label: Text('$unread'),
-                                  backgroundColor: const Color(0xFF25D366),
-                                  child: Icon(
-                                    i == index ? _items[i].$2 : _items[i].$1,
-                                    color: i == index ? fg : muted,
-                                    size: 26,
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(height: 2),
-                              AnimatedDefaultTextStyle(
-                                duration: Motion.fast,
-                                style: tx(
-                                  11,
-                                  weight: i == index
-                                      ? FontWeight.w700
-                                      : FontWeight.w500,
-                                  color: i == index ? fg : muted,
-                                ),
-                                child: Text(_items[i].$3),
-                              ),
-                              // Little active dot.
-                              AnimatedContainer(
-                                duration: Motion.normal,
-                                curve: Motion.ease,
-                                margin: const EdgeInsets.only(top: 3),
-                                width: i == index ? 16 : 0,
-                                height: 3,
-                                decoration: BoxDecoration(
-                                  borderRadius: BorderRadius.circular(2),
-                                  gradient: const LinearGradient(
-                                    colors: AppColors.brandGradient,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
+    final fg = onDark ? AppColors.nightInk : AppColors.ink;
+    final active = onDark ? AppColors.nightLink : AppColors.link;
+    return Glass(
+      radius: 32,
+      dark: onDark,
+      shadow: true,
+      child: SizedBox(
+        height: 64,
+        child: Stack(
+          children: [
+            // The pill that follows the current page.
+            AnimatedAlign(
+              duration: Motion.normal,
+              curve: Motion.ease,
+              alignment: Alignment(-1 + index / 2, 0),
+              child: FractionallySizedBox(
+                widthFactor: 1 / _items.length,
+                child: Center(
+                  child: Container(
+                    width: 52,
+                    height: 52,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: active.withValues(alpha: .13),
+                    ),
+                  ),
                 ),
-            ],
-          ),
+              ),
+            ),
+            Row(
+              children: [
+                for (var i = 0; i < _items.length; i++)
+                  Expanded(
+                    child: i == 2
+                        ? _create(fg)
+                        : _item(i, i == index ? active : fg),
+                  ),
+              ],
+            ),
+          ],
         ),
       ),
     );
   }
+
+  Widget _create(Color fg) => Center(
+    child: Tooltip(
+      message: _items[2].$3,
+      child: Pressable(
+        scale: .88,
+        onTap: () => onSelect(2),
+        child: Container(
+          width: 48,
+          height: 48,
+          decoration: BoxDecoration(shape: BoxShape.circle, color: fg),
+          child: Icon(
+            Icons.add_rounded,
+            size: 26,
+            color: onDark ? AppColors.night : AppColors.onInk,
+          ),
+        ),
+      ),
+    ),
+  );
+
+  Widget _item(int i, Color color) => Tooltip(
+    message: _items[i].$3,
+    child: Pressable(
+      scale: .88,
+      onTap: () => onSelect(i),
+      child: SizedBox.expand(
+        child: Center(
+          child: Badge(
+            isLabelVisible: i == 1 && unread > 0,
+            label: Text('$unread'),
+            backgroundColor: AppColors.accent,
+            child: AnimatedSwitcher(
+              duration: Motion.fast,
+              child: Icon(
+                i == index ? _items[i].$2 : _items[i].$1,
+                key: ValueKey(i == index),
+                color: color,
+                size: 25,
+              ),
+            ),
+          ),
+        ),
+      ),
+    ),
+  );
 }

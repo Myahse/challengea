@@ -17,7 +17,9 @@ class FakeVideo extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final c = post.colors;
+    final image = post.image;
+    if (image != null) return Image(image: image, fit: BoxFit.cover);
+    final c = post.shownColors;
     final a = 2 * pi * t;
     return Stack(
       fit: StackFit.expand,
@@ -84,20 +86,27 @@ class PostThumb extends StatelessWidget {
               gradient: LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
-                colors: post.colors,
+                colors: post.shownColors,
               ),
             ),
           ),
-          Center(
-            child: Text(
-              post.author.person.initials,
-              style: tx(
-                40,
-                weight: FontWeight.w800,
-                color: Colors.white.withValues(alpha: .25),
+          if (post.image != null)
+            Image(image: post.image!, fit: BoxFit.cover)
+          else
+            Padding(
+              padding: const EdgeInsets.fromLTRB(10, 10, 10, 26),
+              child: Center(
+                child: Text(
+                  post.caption.isNotEmpty
+                      ? post.caption
+                      : post.author.person.initials,
+                  maxLines: 4,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
+                  style: tx(14, weight: FontWeight.w600, color: Colors.white),
+                ),
               ),
             ),
-          ),
           Positioned(
             left: 8,
             bottom: 6,

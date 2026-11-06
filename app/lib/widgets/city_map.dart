@@ -2,6 +2,8 @@ import 'dart:math';
 
 import 'package:flutter/material.dart';
 
+import '../theme.dart';
+
 /// Stylised city map (Marcory / Koumassi, Abidjan) drawn in code.
 ///
 /// Prototype only: the web link cannot load real map tiles. In the installed
@@ -17,6 +19,12 @@ class CityMapPainter extends CustomPainter {
   final Offset? focus;
   final double zoom;
 
+  static const _night = ColorFilter.matrix([
+    -1, 0, 0, 0, 255, //
+    0, -1, 0, 0, 255, //
+    0, 0, -1, 0, 255, //
+    0, 0, 0, 1, 0, //
+  ]);
   static const _ground = Color(0xFFF1F1EE);
   static const _roadEdge = Color(0xFFD9DCE1);
   static const _road = Colors.white;
@@ -29,7 +37,12 @@ class CityMapPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    canvas.save();
+    // Night: the same map, inverted.
+    if (AppColors.dark) {
+      canvas.saveLayer(Offset.zero & size, Paint()..colorFilter = _night);
+    } else {
+      canvas.save();
+    }
     canvas.clipRect(Offset.zero & size);
     if (focus != null) {
       canvas.translate(

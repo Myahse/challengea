@@ -146,9 +146,7 @@ class RecordingBar extends StatelessWidget {
         return Row(
           children: [
             const SizedBox(width: 10),
-            _Blink(
-              color: cancelling ? AppColors.muted : const Color(0xFFE5484D),
-            ),
+            _Blink(color: cancelling ? AppColors.muted : AppColors.danger),
             const SizedBox(width: 8),
             Text(
               '${e.inMinutes}:${(e.inSeconds % 60).toString().padLeft(2, '0')}',
@@ -189,7 +187,7 @@ class RecordingBar extends StatelessWidget {
                 key: ValueKey(cancelling),
                 style: tx(
                   12,
-                  color: cancelling ? const Color(0xFFE5484D) : AppColors.muted,
+                  color: cancelling ? AppColors.danger : AppColors.muted,
                 ),
               ),
             ),

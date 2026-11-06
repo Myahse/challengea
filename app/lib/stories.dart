@@ -12,13 +12,27 @@ class StoryItem {
     this.text,
     this.emoji,
     this.photo,
+    this.photoUrl,
+    this.serverId,
+    this.seen = false,
     DateTime? time,
   }) : time = time ?? DateTime.now();
   final List<Color> colors;
   final String? text;
   final String? emoji;
   final Uint8List? photo;
+
+  /// A photo stored on the server.
+  final String? photoUrl;
+
+  /// Null in the demo and while the slide is being sent.
+  int? serverId;
+  bool seen;
   final DateTime time;
+
+  ImageProvider? get image => photo != null
+      ? MemoryImage(photo!)
+      : (photoUrl != null ? NetworkImage(photoUrl!) : null);
 
   String get ago {
     final d = DateTime.now().difference(time);

@@ -44,7 +44,7 @@ class FriendPin extends StatelessWidget {
                   height: size,
                   padding: const EdgeInsets.all(3),
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: AppColors.card,
                     borderRadius: BorderRadius.circular(16),
                     border: selected
                         ? Border.all(color: AppColors.ink, width: 2)
@@ -89,7 +89,7 @@ class FriendPin extends StatelessWidget {
                     vertical: 2,
                   ),
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: AppColors.card,
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text(
@@ -154,11 +154,11 @@ class _MeMarkerState extends State<MeMarker>
                 ? Container(
                     width: 50,
                     height: 50,
-                    decoration: const BoxDecoration(
+                    decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: Colors.white,
+                      color: AppColors.card,
                     ),
-                    child: const Icon(
+                    child: Icon(
                       Icons.visibility_off_rounded,
                       color: AppColors.muted,
                     ),

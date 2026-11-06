@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import '../feed.dart';
 import '../theme.dart';
 
-/// Figma: product sheet over the live video (frame 57:281).
 Future<void> showProduct(BuildContext context, Product product) {
   return showModalBottomSheet(
     context: context,
@@ -36,7 +35,7 @@ class _ProductSheetState extends State<_ProductSheet> {
         16 + MediaQuery.paddingOf(context).bottom,
       ),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.card,
         borderRadius: BorderRadius.circular(32),
       ),
       child: Column(
@@ -83,7 +82,7 @@ class _ProductSheetState extends State<_ProductSheet> {
             'Left: ${p.left}',
             style: tx(
               12,
-              color: p.left < 10 ? const Color(0xFFE5484D) : AppColors.muted,
+              color: p.left < 10 ? AppColors.danger : AppColors.muted,
             ),
           ),
           const SizedBox(height: 6),
@@ -105,7 +104,7 @@ class _ProductSheetState extends State<_ProductSheet> {
                       alignment: Alignment.center,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        color: _size == s ? AppColors.ink : Colors.white,
+                        color: _size == s ? AppColors.ink : AppColors.card,
                         border: Border.all(color: AppColors.ink),
                       ),
                       child: Text(
@@ -113,7 +112,7 @@ class _ProductSheetState extends State<_ProductSheet> {
                         style: tx(
                           12,
                           weight: FontWeight.w700,
-                          color: _size == s ? Colors.white : AppColors.ink,
+                          color: _size == s ? AppColors.onInk : AppColors.ink,
                         ),
                       ),
                     ),
@@ -126,7 +125,7 @@ class _ProductSheetState extends State<_ProductSheet> {
             height: 50,
             child: FilledButton(
               style: FilledButton.styleFrom(
-                backgroundColor: AppColors.ink,
+                backgroundColor: AppColors.accent,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(16),
                 ),

@@ -1,23 +1,24 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-/// Shared motion: one feel across the app (quick, soft, slightly springy).
+/// Shared motion: one feel across the app. Things arrive quickly and settle
+/// slowly, with a long soft tail and no bounce.
 class Motion {
-  static const fast = Duration(milliseconds: 180);
-  static const normal = Duration(milliseconds: 320);
-  static const slow = Duration(milliseconds: 520);
-  static const ease = Curves.easeOutCubic;
-  static const spring = Curves.easeOutBack;
+  static const fast = Duration(milliseconds: 200);
+  static const normal = Duration(milliseconds: 380);
+  static const slow = Duration(milliseconds: 800);
+  static const ease = Cubic(.16, 1, .3, 1);
+  static const spring = Cubic(.2, 1.1, .3, 1);
 }
 
-/// Shrinks a little while pressed and springs back: makes anything feel tappable.
+/// Sinks a little while pressed and settles back: makes anything feel tappable.
 class Pressable extends StatefulWidget {
   const Pressable({
     super.key,
     required this.child,
     this.onTap,
     this.onLongPress,
-    this.scale = .93,
+    this.scale = .96,
     this.haptic = true,
   });
   final Widget child;
@@ -54,9 +55,9 @@ class _PressableState extends State<Pressable> {
       child: AnimatedScale(
         scale: _down ? widget.scale : 1,
         duration: _down
-            ? const Duration(milliseconds: 90)
-            : const Duration(milliseconds: 260),
-        curve: _down ? Curves.easeOut : Curves.elasticOut,
+            ? const Duration(milliseconds: 110)
+            : const Duration(milliseconds: 420),
+        curve: _down ? Curves.easeOut : Motion.ease,
         child: widget.child,
       ),
     );
@@ -69,7 +70,7 @@ class FadeSlideIn extends StatelessWidget {
     super.key,
     required this.child,
     this.delay = Duration.zero,
-    this.offset = const Offset(0, 24),
+    this.offset = const Offset(0, 28),
     this.duration = Motion.slow,
     this.scale = 1,
   });
@@ -83,6 +84,7 @@ class FadeSlideIn extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (MediaQuery.disableAnimationsOf(context)) return child;
     final total = delay + duration;
     final start = total.inMicroseconds == 0
         ? 0.0
@@ -116,7 +118,7 @@ class SmoothPageTransitions extends PageTransitionsBuilder {
   const SmoothPageTransitions();
 
   @override
-  Duration get transitionDuration => const Duration(milliseconds: 420);
+  Duration get transitionDuration => const Duration(milliseconds: 520);
 
   @override
   Widget buildTransitions<T>(
@@ -128,12 +130,12 @@ class SmoothPageTransitions extends PageTransitionsBuilder {
   ) {
     final inCurve = CurvedAnimation(
       parent: animation,
-      curve: Curves.easeOutQuart,
+      curve: Motion.ease,
       reverseCurve: Curves.easeInCubic,
     );
     final outCurve = CurvedAnimation(
       parent: secondaryAnimation,
-      curve: Curves.easeOutCubic,
+      curve: Motion.ease,
     );
     return AnimatedBuilder(
       animation: Listenable.merge([inCurve, outCurve]),
@@ -141,9 +143,9 @@ class SmoothPageTransitions extends PageTransitionsBuilder {
       builder: (context, child) {
         final i = inCurve.value, o = outCurve.value;
         return Transform.translate(
-          offset: Offset((1 - i) * 60, 0),
+          offset: Offset((1 - i) * 44, 0),
           child: Transform.scale(
-            scale: 1 - .05 * o,
+            scale: 1 - .04 * o,
             child: Opacity(
               opacity: (i * (1 - .4 * o)).clamp(0.0, 1.0),
               child: child,
@@ -170,8 +172,8 @@ class CountUp extends StatelessWidget {
   @override
   Widget build(BuildContext context) => TweenAnimationBuilder<double>(
     tween: Tween(begin: 0, end: value.toDouble()),
-    duration: const Duration(milliseconds: 900),
-    curve: Curves.easeOutCubic,
+    duration: const Duration(milliseconds: 1100),
+    curve: Motion.ease,
     builder: (context, v, _) => Text(format(v.round()), style: style),
   );
 }

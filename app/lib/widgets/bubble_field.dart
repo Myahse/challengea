@@ -297,7 +297,7 @@ class _BubbleFieldState extends State<BubbleField>
     final r = _r(n);
     final dragging = identical(n, _dragging);
     final target = identical(n, _hover);
-    final pop = Curves.elasticOut.transform(n.spawn.clamp(0.0, 1.0));
+    final pop = Curves.easeOutBack.transform(n.spawn.clamp(0.0, 1.0));
     final scale = (0.3 + 0.7 * pop) * (target ? 1.14 : (dragging ? 1.08 : 1.0));
     final bob = dragging
         ? Offset.zero
@@ -305,7 +305,7 @@ class _BubbleFieldState extends State<BubbleField>
               2.5 *
               _s;
     final center = n.pos! + bob;
-    final labelSize = (n.radius >= 45 ? 15.0 : 9.0) * _s;
+    final labelSize = (n.radius >= 45 ? 15.0 : 11.0) * _s;
     final width = max(r * 2, 120 * _s);
 
     return Positioned(
@@ -314,7 +314,7 @@ class _BubbleFieldState extends State<BubbleField>
       width: width,
       child: IgnorePointer(
         child: Opacity(
-          // See-through while hovering a target so its green highlight shows.
+          // See-through while hovering a target so its highlight shows.
           opacity: dragging && _hover != null ? .6 : 1,
           child: Transform.scale(
             scale: scale,
@@ -331,7 +331,9 @@ class _BubbleFieldState extends State<BubbleField>
                       Container(
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
-                          color: AppColors.bubble,
+                          color: n.isGroup
+                              ? AppColors.bubble
+                              : Colors.transparent,
                           border: target
                               ? Border.all(
                                   color: AppColors.mergeTarget,
@@ -365,7 +367,7 @@ class _BubbleFieldState extends State<BubbleField>
                             ? GroupAvatar(n.members, diameter: r * 1.75)
                             : PersonAvatar(
                                 n.members.first,
-                                diameter: r * (n.storyRing ? 1.55 : 1.62),
+                                diameter: r * (n.storyRing ? 1.8 : 1.96),
                               ),
                       ),
                       if (target)
@@ -403,7 +405,11 @@ class _BubbleFieldState extends State<BubbleField>
                             ),
                             child: Text(
                               '${n.unread}',
-                              style: tx(13 * _s, weight: FontWeight.w700),
+                              style: tx(
+                                13 * _s,
+                                weight: FontWeight.w600,
+                                color: Colors.white,
+                              ),
                             ),
                           ),
                         ),
@@ -414,11 +420,15 @@ class _BubbleFieldState extends State<BubbleField>
                           child: Container(
                             width: 30 * _s,
                             height: 30 * _s,
-                            decoration: const BoxDecoration(
+                            decoration: BoxDecoration(
                               shape: BoxShape.circle,
                               color: AppColors.bubble,
                             ),
-                            child: Icon(n.tag, size: 17 * _s),
+                            child: Icon(
+                              n.tag,
+                              size: 17 * _s,
+                              color: AppColors.ink,
+                            ),
                           ),
                         ),
                       if (n.isGroup)
@@ -438,8 +448,8 @@ class _BubbleFieldState extends State<BubbleField>
                               '${n.members.length}',
                               style: tx(
                                 10 * _s,
-                                weight: FontWeight.w700,
-                                color: Colors.white,
+                                weight: FontWeight.w600,
+                                color: AppColors.onInk,
                               ),
                             ),
                           ),
@@ -453,7 +463,11 @@ class _BubbleFieldState extends State<BubbleField>
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   textAlign: TextAlign.center,
-                  style: tx(labelSize, weight: FontWeight.w600),
+                  style: tx(
+                    labelSize,
+                    weight: FontWeight.w500,
+                    color: AppColors.ink,
+                  ),
                 ),
               ],
             ),

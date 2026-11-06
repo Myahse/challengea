@@ -4,9 +4,10 @@ import 'package:flutter/material.dart';
 
 import '../models.dart';
 import '../theme.dart';
+import 'glass.dart';
 
-/// Placeholder avatar (colored disc + initial). Swap for the real profile
-/// pictures from the Figma file / user uploads later.
+/// A person as a glossy bubble with their initial. Swap the initial for the
+/// profile picture once people can upload one.
 class PersonAvatar extends StatelessWidget {
   const PersonAvatar(
     this.person, {
@@ -20,25 +21,23 @@ class PersonAvatar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final c = person.color;
     return Container(
       width: diameter,
       height: diameter,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [Color.lerp(c, Colors.white, .35)!, c],
-        ),
+      decoration: orbBody(person.color, shadow: diameter >= 44).copyWith(
         border: border > 0
             ? Border.all(color: Colors.white, width: border)
             : null,
       ),
+      foregroundDecoration: orbShine,
       alignment: Alignment.center,
       child: Text(
         person.initials,
-        style: tx(diameter * .42, weight: FontWeight.w700, color: Colors.white),
+        style: tx(
+          diameter * .38,
+          weight: FontWeight.w600,
+          color: Colors.white.withValues(alpha: .92),
+        ),
       ),
     );
   }
@@ -71,7 +70,7 @@ class GroupAvatar extends StatelessWidget {
               height: mini,
               decoration: const BoxDecoration(
                 shape: BoxShape.circle,
-                color: AppColors.ink,
+                color: AppColors.nightCard,
               ),
               alignment: Alignment.center,
               child: Text(

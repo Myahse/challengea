@@ -7,6 +7,25 @@ import 'models.dart';
 
 enum PostKind { video, photo, story }
 
+/// Facebook-style reactions and their names on the server.
+const reactionTypes = {
+  '👍': 'like',
+  '❤️': 'love',
+  '😂': 'haha',
+  '😮': 'wow',
+  '😢': 'sad',
+  '😡': 'angry',
+};
+
+/// "now", "5m", "3h", "2d".
+String shortAgo(DateTime time) {
+  final d = DateTime.now().difference(time);
+  if (d.inMinutes < 1) return 'now';
+  if (d.inHours < 1) return '${d.inMinutes}m';
+  if (d.inDays < 1) return '${d.inHours}h';
+  return '${d.inDays}d';
+}
+
 class Product {
   const Product(
     this.name,
@@ -29,16 +48,23 @@ class Comment {
     this.author,
     this.text, {
     this.translation,
-    this.ago = '1d',
+    String ago = '1d',
     this.likes = 0,
     this.hasImage = false,
     this.moreReplies = 0,
-  });
+    this.serverId,
+    this.time,
+  }) : _ago = ago;
   final Person author;
   final String text;
   final String? translation;
-  final String ago;
+  final String _ago;
   int likes;
+
+  /// Null in the demo and while the comment is being sent.
+  int? serverId;
+  DateTime? time;
+  String get ago => time == null ? _ago : shortAgo(time!);
   bool liked = false;
   final bool hasImage;
   final int moreReplies;
@@ -65,9 +91,13 @@ class Post {
     List<Comment>? comments,
     this.commentCount = 0,
     this.photo,
-    this.ago = '2h',
+    this.photoUrl,
+    String ago = '2h',
     this.textCard = false,
-  }) : comments = comments ?? [];
+    this.serverId,
+    this.time,
+  }) : comments = comments ?? [],
+       _ago = ago;
 
   /// Short text shown big on a coloured background (Facebook-style).
   final bool textCard;
@@ -75,8 +105,28 @@ class Post {
   /// A photo posted from this phone (home feed).
   final Uint8List? photo;
 
+  /// A photo stored on the server.
+  final String? photoUrl;
+
+  ImageProvider? get image => photo != null
+      ? MemoryImage(photo!)
+      : (photoUrl != null ? NetworkImage(photoUrl!) : null);
+
+  /// Null in the demo and while the post is being sent.
+  int? serverId;
+
+  /// Finishes when a post from this phone has reached the server.
+  Future<void>? saving;
+  DateTime? time;
+
   /// When it was posted, as shown on the card ("2h", "Just now").
-  final String ago;
+  final String _ago;
+  String get ago => time == null ? _ago : shortAgo(time!);
+
+  /// For gradients, which need at least two colours.
+  List<Color> get shownColors => colors.length >= 2
+      ? colors
+      : const [Color(0xFF2C2C2E), Color(0xFF000000)];
 
   /// My Facebook-style reaction (👍 ❤️ 😂 😮 😢 😡), or null.
   String? reaction;
@@ -136,7 +186,17 @@ String compact(int n) {
   return '$n';
 }
 
-/// Profiles, videos and comments (in memory for the prototype).
+/// Saves what happens in the feed. Set when signed in.
+abstract interface class FeedRemote {
+  void publishPost(Post p);
+  void react(Post p);
+  void comment(Post p, Comment c, Comment? thread);
+  void loadComments(Post p);
+  void loadMorePosts();
+}
+
+/// Profiles, videos and comments. Signed in, the home feed comes from the
+/// server; the Videos page stays on demo content until real videos exist.
 class FeedData extends ChangeNotifier {
   FeedData({required Person me, required List<Person> friends}) {
     _seed(me, friends);
@@ -148,8 +208,67 @@ class FeedData extends ChangeNotifier {
   /// Posts I wrote from the composer (top of the home feed).
   final List<Post> created = [];
 
+  FeedRemote? remote;
+
+  /// Sorts above every server id. Not a shift: the web build has 32-bit shifts.
+  static const _sending = 9007199254740991;
+
+  /// Signed in: my friends' posts and mine, newest first.
+  final List<Post> timeline = [];
+
+  /// Switches from the demo profile to the signed-in account.
+  void goOnline(FeedRemote r, Person person, String handle, String bio) {
+    remote = r;
+    creators.remove(me.person.id);
+    me = creators[person.id] = Creator(
+      person,
+      handle: handle,
+      bio: bio,
+      isMe: true,
+    );
+    notifyListeners();
+  }
+
+  /// For the sync layer (notifyListeners is protected).
+  void notifyChanged() => notifyListeners();
+
+  Post? byServerId(int id) =>
+      timeline.where((p) => p.serverId == id).firstOrNull;
+
+  /// Adds posts from the server; ones being sent stay on top.
+  void merge(Iterable<Post> posts) {
+    for (final p in posts) {
+      if (!timeline.contains(p)) {
+        timeline.add(p);
+        if (!p.author.posts.contains(p)) p.author.posts.add(p);
+      }
+    }
+    int newest(Post a, Post b) =>
+        (b.serverId ?? _sending).compareTo(a.serverId ?? _sending);
+    timeline.sort(newest);
+    for (final c in creators.values) {
+      if (c.posts.any((p) => p.serverId != null)) c.posts.sort(newest);
+    }
+    notifyListeners();
+  }
+
+  /// Takes away a post (it couldn't be sent, or I can no longer see it).
+  void removePost(Post p) {
+    timeline.remove(p);
+    p.author.posts.remove(p);
+    notifyListeners();
+  }
+
+  void loadComments(Post p) {
+    if (p.serverId != null) remote?.loadComments(p);
+  }
+
+  /// The end of the feed is in sight.
+  void loadMore() => remote?.loadMorePosts();
+
   /// The home feed: my new posts, then friends' videos and photos.
   List<Post> get home {
+    if (remote != null) return timeline;
     final seen = <String>{};
     final out = <Post>[];
     void add(Post p) {
@@ -174,9 +293,10 @@ class FeedData extends ChangeNotifier {
   ];
 
   void addPost(Post p) {
-    created.insert(0, p);
+    (remote != null ? timeline : created).insert(0, p);
     me.posts.insert(0, p);
     notifyListeners();
+    remote?.publishPost(p);
   }
 
   /// Facebook reactions: tapping the same one again removes it.
@@ -186,6 +306,7 @@ class FeedData extends ChangeNotifier {
     p.liked = p.reaction != null;
     p.likes += (p.reaction != null ? 1 : 0) - (had ? 1 : 0);
     notifyListeners();
+    if (p.serverId != null || p.saving != null) remote?.react(p);
   }
 
   late Creator me;
@@ -199,6 +320,7 @@ class FeedData extends ChangeNotifier {
   );
 
   void toggleLike(Post p) {
+    if (p.serverId != null) return react(p, p.reaction ?? '👍');
     p.liked = !p.liked;
     p.likes += p.liked ? 1 : -1;
     notifyListeners();
@@ -236,13 +358,23 @@ class FeedData extends ChangeNotifier {
 
   void addComment(Post p, String text, {Comment? replyTo}) {
     final c = Comment(me.person, text, ago: 'now');
-    if (replyTo != null) {
-      replyTo.replies.add(c);
+    // Replies are one level deep: answering a reply joins its thread.
+    final thread = replyTo == null
+        ? null
+        : p.comments.firstWhere(
+            (t) => t == replyTo || t.replies.contains(replyTo),
+            orElse: () => replyTo,
+          );
+    if (thread != null) {
+      thread.replies.add(c);
     } else {
       p.comments.insert(0, c);
     }
     p.commentCount++;
     notifyListeners();
+    if (p.serverId != null || p.saving != null) {
+      remote?.comment(p, c, thread);
+    }
   }
 
   void _seed(Person mePerson, List<Person> friends) {

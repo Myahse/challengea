@@ -33,6 +33,6 @@ dev_dependencies:
 flutter:
   uses-material-design: true
   fonts:
-    - family: Outfit
+    - family: InterTight
       fonts:
-        - asset: assets/fonts/Outfit.ttf
+        - asset: assets/fonts/InterTight.ttf

@@ -13,7 +13,7 @@ Future<void> showFriendsSheet(BuildContext context, OnlineSync online) {
     context: context,
     isScrollControlled: true,
     showDragHandle: true,
-    backgroundColor: Colors.white,
+    backgroundColor: AppColors.card,
     builder: (_) => _FriendsSheet(online: online),
   );
 }
@@ -97,7 +97,7 @@ class _FriendsSheetState extends State<_FriendsSheet> {
                   hintText: 'Search @handle or name',
                   hintStyle: tx(15, color: AppColors.muted),
                   filled: true,
-                  fillColor: const Color(0xFFF2F2F2),
+                  fillColor: AppColors.page,
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(16),
                     borderSide: BorderSide.none,
@@ -125,7 +125,7 @@ class _FriendsSheetState extends State<_FriendsSheet> {
                         ),
                         trailing: FilledButton(
                           style: FilledButton.styleFrom(
-                            backgroundColor: AppColors.ink,
+                            backgroundColor: AppColors.accent,
                           ),
                           onPressed: () async {
                             await online.acceptFriend(p);

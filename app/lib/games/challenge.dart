@@ -22,7 +22,7 @@ Future<void> challengeWithGame(
   final friend = await showModalBottomSheet<Person>(
     context: context,
     showDragHandle: true,
-    backgroundColor: Colors.white,
+    backgroundColor: AppColors.card,
     builder: (ctx) => SafeArea(
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -66,7 +66,7 @@ Future<void> challengeFriend(
   final game = await showModalBottomSheet<GameInfo>(
     context: context,
     showDragHandle: true,
-    backgroundColor: Colors.white,
+    backgroundColor: AppColors.card,
     builder: (ctx) => SafeArea(
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -220,7 +220,7 @@ class _WaitingDialogState extends State<_WaitingDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      backgroundColor: Colors.white,
+      backgroundColor: AppColors.card,
       contentPadding: const EdgeInsets.fromLTRB(24, 24, 24, 8),
       content: Column(
         mainAxisSize: MainAxisSize.min,
@@ -246,7 +246,7 @@ class _WaitingDialogState extends State<_WaitingDialog> {
           Text(widget.game.name, style: tx(13, color: AppColors.muted)),
           const SizedBox(height: 16),
           if (!_accepted)
-            const LinearProgressIndicator(color: AppColors.ink)
+            LinearProgressIndicator(color: AppColors.ink)
           else
             const Icon(Icons.check_circle, color: AppColors.online, size: 30),
         ],
@@ -325,7 +325,7 @@ Future<void> showInvite(
   final accept = await showDialog<bool>(
     context: context,
     builder: (ctx) => AlertDialog(
-      backgroundColor: Colors.white,
+      backgroundColor: AppColors.card,
       contentPadding: const EdgeInsets.fromLTRB(24, 24, 24, 8),
       content: Column(
         mainAxisSize: MainAxisSize.min,
@@ -357,7 +357,7 @@ Future<void> showInvite(
           child: const Text('Not now'),
         ),
         FilledButton(
-          style: FilledButton.styleFrom(backgroundColor: AppColors.ink),
+          style: FilledButton.styleFrom(backgroundColor: AppColors.accent),
           onPressed: () => Navigator.pop(ctx, true),
           child: const Text('Play'),
         ),
@@ -416,7 +416,7 @@ class _OnlineWaitingDialogState extends State<_OnlineWaitingDialog> {
   Widget build(BuildContext context) {
     final accepted = widget.match.status == 'active';
     return AlertDialog(
-      backgroundColor: Colors.white,
+      backgroundColor: AppColors.card,
       contentPadding: const EdgeInsets.fromLTRB(24, 24, 24, 8),
       content: Column(
         mainAxisSize: MainAxisSize.min,
@@ -454,7 +454,7 @@ class _OnlineWaitingDialogState extends State<_OnlineWaitingDialog> {
                   color: AppColors.online,
                   size: 30,
                 )
-              : const LinearProgressIndicator(color: AppColors.ink),
+              : LinearProgressIndicator(color: AppColors.ink),
         ],
       ),
       actions: [

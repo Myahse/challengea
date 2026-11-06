@@ -7,9 +7,11 @@ import 'package:latlong2/latlong.dart';
 
 import '../call.dart';
 import '../chat_store.dart';
+import '../feed.dart';
 import '../games/games.dart';
 import '../geo.dart';
 import '../models.dart';
+import '../stories.dart';
 import 'api_client.dart';
 import 'live_call.dart';
 import 'push.dart';
@@ -49,7 +51,7 @@ class OnlineMatch extends ChangeNotifier {
 
 /// Connects the app's data ([ChatStore]) to the backend: loads everything,
 /// sends what you do, and applies live events from other phones.
-class OnlineSync {
+class OnlineSync implements FeedRemote {
   OnlineSync(this.store, this.api, this.myId);
 
   final ChatStore store;
@@ -134,7 +136,12 @@ class OnlineSync {
     final sync = OnlineSync(store, api, (meDto['id'] as num).toInt());
     final me = sync.personFrom(meDto);
     store.goOnline(sync, me);
-    store.feed.me.bio = (meDto['bio'] as String?) ?? '';
+    store.feed.goOnline(
+      sync,
+      me,
+      (meDto['handle'] as String?) ?? me.firstName.toLowerCase(),
+      (meDto['bio'] as String?) ?? '',
+    );
     await sync.refreshAll();
     unawaited(PushService.start(sync));
     sync._realtime = Realtime(
@@ -281,6 +288,8 @@ class OnlineSync {
       refreshConversations(),
       refreshLocations(),
       refreshMatches(),
+      refreshFeed(),
+      refreshStories(),
     ]);
   }
 
@@ -441,6 +450,319 @@ class OnlineSync {
     final match = matches[id] ??= OnlineMatch(id);
     match.apply(d, this);
     return match;
+  }
+
+  // ------------------------------------------------------------- feed
+  static const _pageSize = 20;
+  bool _feedLoading = false;
+  bool _feedEnded = false;
+  final Map<Post, int> _reactSeq = {};
+  final Map<Post, Future<void>> _reactQueue = {};
+  final Set<Post> _commentsLoaded = {};
+
+  FeedData get _feed => store.feed;
+
+  String _mediaUrl(String url) =>
+      url.startsWith('http') ? url : '${api.baseUrl}$url';
+
+  /// "#112233,#445566" <-> gradient colours.
+  static List<Color> _colorsFrom(String? background) => background == null
+      ? const []
+      : [for (final hex in background.split(',')) _color(hex)];
+
+  static String _backgroundOf(List<Color> colors) => [
+    for (final c in colors)
+      '#${(c.toARGB32() & 0xFFFFFF).toRadixString(16).padLeft(6, '0')}',
+  ].join(',');
+
+  static String? _emojiFor(String? type) =>
+      reactionTypes.entries.where((e) => e.value == type).firstOrNull?.key;
+
+  /// The post with this server id, created or brought up to date.
+  Post _postFrom(Map<String, dynamic> d) {
+    final id = (d['id'] as num).toInt();
+    final reaction = _emojiFor(d['myReaction'] as String?);
+    final likes = (d['reactions'] as num).toInt();
+    final comments = (d['commentCount'] as num).toInt();
+    final known = _feed.byServerId(id);
+    if (known != null) {
+      known
+        ..reaction = reaction
+        ..liked = reaction != null
+        ..likes = likes
+        ..commentCount = comments;
+      return known;
+    }
+    final u = d['author'] as Map<String, dynamic>;
+    final person = personFrom(u);
+    final url = d['mediaUrl'] as String?;
+    final background = d['background'] as String?;
+    return Post(
+        id: 'p$id',
+        serverId: id,
+        author: _feed.creators[person.id] ??= Creator(
+          person,
+          handle: u['handle'] as String,
+          bio: (u['bio'] as String?) ?? '',
+        ),
+        caption: (d['body'] as String?) ?? '',
+        colors: _colorsFrom(background),
+        kind: PostKind.photo,
+        photoUrl: url == null ? null : _mediaUrl(url),
+        textCard: background != null && url == null,
+        likes: likes,
+        commentCount: comments,
+        time: DateTime.tryParse(d['createdAt'] as String? ?? '')?.toLocal(),
+      )
+      ..reaction = reaction
+      ..liked = reaction != null;
+  }
+
+  /// The newest posts. What they replace but no longer contain is gone
+  /// (for example the friendship ended).
+  Future<void> refreshFeed() async {
+    final list = await _quiet(() => api.get('/posts?limit=$_pageSize'));
+    if (list is! List) return;
+    final page = [for (final d in list) _postFrom(d as Map<String, dynamic>)];
+    final oldest = page.isEmpty ? 0 : page.last.serverId!;
+    final gone = _feed.timeline.where(
+      (p) => p.serverId != null && p.serverId! > oldest && !page.contains(p),
+    );
+    gone.toList().forEach(_feed.removePost);
+    _feed.merge(page);
+  }
+
+  @override
+  Future<void> loadMorePosts() async {
+    if (_feedLoading || _feedEnded) return;
+    final oldest = _feed.timeline.where((p) => p.serverId != null).lastOrNull;
+    if (oldest == null) return;
+    _feedLoading = true;
+    final list = await _quiet(
+      () => api.get('/posts?limit=$_pageSize&before=${oldest.serverId}'),
+    );
+    _feedLoading = false;
+    if (list is! List) return;
+    if (list.length < _pageSize) _feedEnded = true;
+    _feed.merge([for (final d in list) _postFrom(d as Map<String, dynamic>)]);
+  }
+
+  static String _imageType(Uint8List b) {
+    bool starts(List<int> sig) =>
+        b.length > sig.length &&
+        [for (var i = 0; i < sig.length; i++) b[i] == sig[i]].every((x) => x);
+    if (starts(const [0x89, 0x50, 0x4E, 0x47])) return 'image/png';
+    if (starts(const [0x47, 0x49, 0x46])) return 'image/gif';
+    if (starts(const [0x52, 0x49, 0x46, 0x46])) return 'image/webp';
+    return 'image/jpeg';
+  }
+
+  Future<String> _uploadPhoto(Uint8List bytes) async {
+    final type = _imageType(bytes);
+    final up = await api.upload(
+      '/media',
+      bytes,
+      filename: 'photo.${type.split('/').last}',
+      contentType: type,
+      fields: {'kind': 'image'},
+    );
+    return (up as Map)['url'] as String;
+  }
+
+  @override
+  void publishPost(Post p) => p.saving = _publishPost(p);
+
+  Future<void> _publishPost(Post p) async {
+    try {
+      final url = p.photo == null ? null : await _uploadPhoto(p.photo!);
+      final dto =
+          await api.post('/posts', {
+                if (p.caption.isNotEmpty) 'body': p.caption,
+                'mediaUrl': ?url,
+                if (p.textCard) 'background': _backgroundOf(p.colors),
+              })
+              as Map<String, dynamic>;
+      final id = (dto['id'] as num).toInt();
+      // A refresh may have brought this post back first: keep a single copy.
+      final twin = _feed.byServerId(id);
+      if (twin != null) _feed.removePost(twin);
+      p
+        ..serverId = id
+        ..time = DateTime.tryParse(dto['createdAt'] as String)?.toLocal();
+      _feed.merge(const []);
+    } on ApiError catch (e) {
+      _feed.removePost(p);
+      onNotice?.call('Not posted: ${e.message}');
+    }
+  }
+
+  /// Reactions on one post go out one at a time, so the last tap wins.
+  @override
+  void react(Post p) {
+    final wanted = reactionTypes[p.reaction];
+    final seq = _reactSeq[p] = (_reactSeq[p] ?? 0) + 1;
+    _reactQueue[p] = (_reactQueue[p] ?? Future.value()).then((_) async {
+      await p.saving;
+      final id = p.serverId;
+      if (id == null) return;
+      final dto = await _act(
+        () => api.put('/posts/$id/reaction', {'type': wanted}),
+      );
+      if (_reactSeq[p] != seq) return; // a newer tap is on its way
+      if (dto is Map<String, dynamic>) {
+        _postFrom(dto);
+        _feed.notifyChanged();
+      } else {
+        await refreshFeed(); // not saved: show what the server has
+      }
+    });
+  }
+
+  Comment _commentFrom(Map<String, dynamic> d) => Comment(
+    personFrom(d['author'] as Map<String, dynamic>),
+    d['body'] as String,
+    serverId: (d['id'] as num).toInt(),
+    time: DateTime.tryParse(d['createdAt'] as String? ?? '')?.toLocal(),
+  );
+
+  /// Newest threads first; replies in the order they were written.
+  void _placeComment(Post p, Comment c, int? parentId) {
+    if (parentId == null) {
+      p.comments.insert(0, c);
+    } else {
+      p.comments
+          .where((t) => t.serverId == parentId)
+          .firstOrNull
+          ?.replies
+          .add(c);
+    }
+  }
+
+  @override
+  Future<void> loadComments(Post p) async {
+    final list = await _quiet(() => api.get('/posts/${p.serverId}/comments'));
+    if (list is! List) return;
+    final sending = p.comments.where((c) => c.serverId == null).toList();
+    p.comments.clear();
+    for (final d in list) {
+      final m = d as Map<String, dynamic>;
+      _placeComment(p, _commentFrom(m), (m['parentId'] as num?)?.toInt());
+    }
+    p.comments.insertAll(0, sending);
+    p.commentCount = list.length + sending.length;
+    _commentsLoaded.add(p);
+    _feed.notifyChanged();
+  }
+
+  @override
+  Future<void> comment(Post p, Comment c, Comment? thread) async {
+    try {
+      await p.saving;
+      final dto =
+          await api.post('/posts/${p.serverId}/comments', {
+                'body': c.text,
+                'parentId': ?thread?.serverId,
+              })
+              as Map<String, dynamic>;
+      c
+        ..serverId = (dto['id'] as num).toInt()
+        ..time = DateTime.tryParse(dto['createdAt'] as String)?.toLocal();
+      _feed.notifyChanged();
+    } on ApiError catch (e) {
+      p.comments.remove(c);
+      thread?.replies.remove(c);
+      p.commentCount--;
+      _feed.notifyChanged();
+      onNotice?.call('Comment not sent: ${e.message}');
+    }
+  }
+
+  void _onReaction(Map<String, dynamic> d) {
+    final p = _feed.byServerId((d['postId'] as num).toInt());
+    if (p == null) return;
+    p.likes = (d['reactions'] as num).toInt();
+    // My tap from another phone. On this phone the answer to the tap decides.
+    if (d['userId'] == myId && !_reactSeq.containsKey(p)) {
+      p.reaction = _emojiFor(d['type'] as String?);
+      p.liked = p.reaction != null;
+    }
+    _feed.notifyChanged();
+  }
+
+  void _onComment(Map<String, dynamic> d) {
+    final dto = d['comment'] as Map<String, dynamic>;
+    final p = _feed.byServerId((dto['postId'] as num).toInt());
+    if (p == null) return;
+    p.commentCount = (d['commentCount'] as num).toInt();
+    final author = (dto['author'] as Map)['id'];
+    if (author != myId && _commentsLoaded.contains(p)) {
+      _placeComment(p, _commentFrom(dto), (dto['parentId'] as num?)?.toInt());
+    }
+    _feed.notifyChanged();
+  }
+
+  // ------------------------------------------------------------- stories
+  Future<void> refreshStories() async {
+    final list = await _quiet(() => api.get('/stories'));
+    if (list is! List) return;
+    final others = <Story>[];
+    var mine = <StoryItem>[];
+    for (final s in list) {
+      final m = s as Map<String, dynamic>;
+      final person = personFrom(m['user'] as Map<String, dynamic>);
+      final items = [
+        for (final i in m['items'] as List)
+          _storyItemFrom(i as Map<String, dynamic>),
+      ];
+      if (isMe(person)) {
+        mine = items;
+      } else {
+        others.add(Story(person, items)..seen = items.every((i) => i.seen));
+      }
+    }
+    store.stories
+      ..clear()
+      ..addAll(others);
+    store.myStory.items
+      ..removeWhere((i) => i.serverId != null)
+      ..insertAll(0, mine);
+    store.notifyChanged();
+  }
+
+  StoryItem _storyItemFrom(Map<String, dynamic> d) {
+    final colors = _colorsFrom(d['background'] as String?);
+    final url = d['mediaUrl'] as String?;
+    return StoryItem(
+      colors: colors.length >= 2 ? colors : StoryItem().colors,
+      text: d['body'] as String?,
+      photoUrl: url == null ? null : _mediaUrl(url),
+      serverId: (d['id'] as num).toInt(),
+      seen: d['seen'] == true,
+      time: DateTime.tryParse(d['createdAt'] as String? ?? '')?.toLocal(),
+    );
+  }
+
+  Future<void> publishStoryItem(StoryItem item) async {
+    try {
+      final url = item.photo == null ? null : await _uploadPhoto(item.photo!);
+      final dto =
+          await api.post('/stories', {
+                'body': ?item.text,
+                'mediaUrl': ?url,
+                'background': _backgroundOf(item.colors),
+              })
+              as Map<String, dynamic>;
+      item.serverId = (dto['id'] as num).toInt();
+    } on ApiError catch (e) {
+      store.myStory.items.remove(item);
+      store.notifyChanged();
+      onNotice?.call('Not added to your story: ${e.message}');
+    }
+  }
+
+  void viewStoryItem(StoryItem item) {
+    final id = item.serverId;
+    if (id != null) _quiet(() => api.post('/stories/items/$id/view'));
   }
 
   // ------------------------------------------------------------- actions
@@ -765,6 +1087,9 @@ class OnlineSync {
   int? _callIdOf(CallSession? s) => (s?.link as LiveCall?)?.callId;
 
   // ------------------------------------------------------------- live events
+  @visibleForTesting
+  void handleEvent(String type, dynamic data) => _onEvent(type, data);
+
   void _onEvent(String type, dynamic data) {
     final d = data is Map ? data.cast<String, dynamic>() : <String, dynamic>{};
     switch (type) {
@@ -783,9 +1108,19 @@ class OnlineSync {
       case 'friend.accepted':
         refreshFriends();
         refreshConversations();
+        refreshFeed();
+        refreshStories();
         onNotice?.call(
           '${(d['by'] as Map)['displayName']} accepted your request',
         );
+      case 'post.new':
+        _feed.merge([_postFrom(d)]);
+      case 'post.reaction':
+        _onReaction(d);
+      case 'post.comment':
+        _onComment(d);
+      case 'story.new':
+        refreshStories();
       case 'location.updated':
         final spot = _spotFrom(d);
         store.spots

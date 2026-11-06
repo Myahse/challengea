@@ -46,7 +46,14 @@ public class MediaService {
     return media.findById(id);
   }
 
-  /** A message may only point to a file its sender uploaded. */
+  /** Removes a file by its URL (the photo of an expired story). */
+  @Transactional
+  public void delete(String url) {
+    var m = URL.matcher(url);
+    if (m.matches()) media.deleteById(m.group(1));
+  }
+
+  /** A message, post or story may only point to a file its sender uploaded. */
   @Transactional(readOnly = true)
   public void requireOwned(long me, String url, String expectedKind) {
     var m = URL.matcher(url == null ? "" : url);

@@ -42,7 +42,7 @@ class _FourInRowScreenState extends State<FourInRowScreen> {
   int? _winner; // 1 me, 2 friend, 0 draw
   int _moves = 0;
 
-  static const me = Color(0xFFE5484D);
+  static const me = AppColors.danger;
   static const friendColor = Color(0xFFFFC53D);
 
   @override
@@ -189,10 +189,10 @@ class _FourInRowScreenState extends State<FourInRowScreen> {
       _ => _myTurn ? 'Your turn: tap a column' : '${f.firstName} is thinking…',
     };
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: AppColors.card,
       appBar: AppBar(
-        backgroundColor: Colors.white,
-        surfaceTintColor: Colors.white,
+        backgroundColor: AppColors.card,
+        surfaceTintColor: Colors.transparent,
         centerTitle: true,
         title: Text('Four in a row', style: tx(16, weight: FontWeight.w700)),
       ),
@@ -254,7 +254,7 @@ class _FourInRowScreenState extends State<FourInRowScreen> {
                     Expanded(
                       child: FilledButton(
                         style: FilledButton.styleFrom(
-                          backgroundColor: AppColors.ink,
+                          backgroundColor: AppColors.accent,
                         ),
                         onPressed: _rematch,
                         child: const Text('Rematch'),
@@ -361,9 +361,9 @@ class _FourInRowScreenState extends State<FourInRowScreen> {
     return Padding(
       padding: const EdgeInsets.all(3),
       child: Container(
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           shape: BoxShape.circle,
-          color: Colors.white,
+          color: AppColors.card,
         ),
         child: disc == null
             ? null

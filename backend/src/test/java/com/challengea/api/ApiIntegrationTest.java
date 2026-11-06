@@ -34,6 +34,12 @@ class ApiIntegrationTest {
   @LocalServerPort
   int port;
 
+  @org.springframework.beans.factory.annotation.Autowired
+  org.springframework.jdbc.core.JdbcTemplate jdbc;
+
+  @org.springframework.beans.factory.annotation.Autowired
+  com.challengea.api.social.StoryService storyService;
+
   RestClient http;
 
   @BeforeEach
@@ -339,5 +345,169 @@ class ApiIntegrationTest {
       assertThat(e).as("event " + type).isNotNull();
       if (type.equals(e.get("type"))) return e;
     }
+  }
+
+  static final ParameterizedTypeReference<List<Map<String, Object>>> LIST = new ParameterizedTypeReference<>() {};
+
+  Map<String, Object> put(String path, Object body, String token) {
+    return http.put().uri(path).header("Authorization", "Bearer " + token).body(body).retrieve()
+        .body(new ParameterizedTypeReference<Map<String, Object>>() {});
+  }
+
+  String uploadImage(String token) {
+    var part = new org.springframework.core.io.ByteArrayResource(new byte[] {1, 2, 3}) {
+      @Override
+      public String getFilename() {
+        return "a.png";
+      }
+    };
+    var form = new org.springframework.util.LinkedMultiValueMap<String, Object>();
+    var headers = new org.springframework.http.HttpHeaders();
+    headers.setContentType(org.springframework.http.MediaType.IMAGE_PNG);
+    form.add("file", new org.springframework.http.HttpEntity<>(part, headers));
+    form.add("kind", "image");
+    var res = http.post().uri("/media").header("Authorization", "Bearer " + token)
+        .contentType(org.springframework.http.MediaType.MULTIPART_FORM_DATA).body(form).retrieve()
+        .body(new ParameterizedTypeReference<Map<String, Object>>() {});
+    return (String) res.get("url");
+  }
+
+  @Test
+  void postsReachFriendsOnly() {
+    var author = signUp("Author");
+    var friend = signUp("Friend");
+    var stranger = signUp("Stranger");
+    befriend(author, friend);
+
+    var url = uploadImage(author.token());
+    var created = post("/posts", Map.of("body", " Hello ", "mediaUrl", url), author.token());
+    long id = ((Number) created.get("id")).longValue();
+    assertThat(created.get("body")).isEqualTo("Hello");
+    assertThat(((Map<String, Object>) created.get("author")).get("displayName")).isEqualTo("Author");
+
+    assertThat(get("/posts", friend.token(), LIST)).extracting(p -> p.get("mediaUrl")).contains(url);
+    assertThat(get("/posts", stranger.token(), LIST)).isEmpty();
+    assertThatThrownBy(() -> get("/posts/" + id + "/comments", stranger.token(), LIST))
+        .isInstanceOf(HttpClientErrorException.NotFound.class);
+    assertThatThrownBy(() -> put("/posts/" + id + "/reaction", Map.of("type", "love"), stranger.token()))
+        .isInstanceOf(HttpClientErrorException.NotFound.class);
+    // A photo must be your own, and a post can't be empty.
+    assertThatThrownBy(() -> post("/posts", Map.of("mediaUrl", url), friend.token()))
+        .isInstanceOf(HttpClientErrorException.Forbidden.class);
+    assertThatThrownBy(() -> post("/posts", Map.of("body", "  "), friend.token()))
+        .hasMessageContaining("empty_post");
+
+    // Paging: older posts come after the oldest id you have.
+    post("/posts", Map.of("body", "Second", "background", "#112233,#445566"), author.token());
+    var first = get("/posts?limit=1", author.token(), LIST);
+    assertThat(first).hasSize(1);
+    assertThat(first.getFirst().get("body")).isEqualTo("Second");
+    assertThat(first.getFirst().get("background")).isEqualTo("#112233,#445566");
+    var older = get("/posts?limit=1&before=" + first.getFirst().get("id"), author.token(), LIST);
+    assertThat(older.getFirst().get("id")).isEqualTo(created.get("id"));
+    assertThatThrownBy(() -> post("/posts", Map.of("body", "x", "background", "red"), author.token()))
+        .hasMessageContaining("invalid_background");
+  }
+
+  @Test
+  void oneReactionPerPersonAndNestedComments() {
+    var author = signUp("Author");
+    var friend = signUp("Friend");
+    befriend(author, friend);
+    long id = ((Number) post("/posts", Map.of("body", "Hi"), author.token()).get("id")).longValue();
+    var path = "/posts/" + id;
+
+    assertThat(put(path + "/reaction", Map.of("type", "like"), friend.token()).get("reactions")).isEqualTo(1);
+    var changed = put(path + "/reaction", Map.of("type", "love"), friend.token());
+    assertThat(changed.get("reactions")).isEqualTo(1);
+    assertThat(changed.get("myReaction")).isEqualTo("love");
+    assertThat(put(path + "/reaction", Map.of("type", "wow"), author.token()).get("reactions")).isEqualTo(2);
+    assertThatThrownBy(() -> put(path + "/reaction", Map.of("type", "nope"), author.token()))
+        .hasMessageContaining("invalid_reaction");
+    var removed = put(path + "/reaction", java.util.Collections.singletonMap("type", null), friend.token());
+    assertThat(removed.get("reactions")).isEqualTo(1);
+    assertThat(removed.get("myReaction")).isNull();
+
+    var top = post(path + "/comments", Map.of("body", "Nice"), friend.token());
+    var reply = post(path + "/comments", Map.of("body", "Thanks", "parentId", top.get("id")), author.token());
+    assertThat(reply.get("parentId")).isEqualTo(top.get("id"));
+    // Answering a reply stays in the same thread.
+    var deep = post(path + "/comments", Map.of("body", "!", "parentId", reply.get("id")), friend.token());
+    assertThat(deep.get("parentId")).isEqualTo(top.get("id"));
+
+    var list = get(path + "/comments", author.token(), LIST);
+    assertThat(list).extracting(c -> c.get("body")).containsExactly("Nice", "Thanks", "!");
+    var feed = get("/posts", friend.token(), LIST).getFirst();
+    assertThat(feed.get("commentCount")).isEqualTo(3);
+    assertThat(feed.get("reactions")).isEqualTo(1);
+
+    // A parent from another post is refused.
+    long other = ((Number) post("/posts", Map.of("body", "Other"), author.token()).get("id")).longValue();
+    assertThatThrownBy(() -> post("/posts/" + other + "/comments", Map.of("body", "x", "parentId", top.get("id")),
+        author.token())).isInstanceOf(HttpClientErrorException.NotFound.class);
+  }
+
+  @Test
+  void storiesLast24HoursAndRememberViews() {
+    var author = signUp("Author");
+    var friend = signUp("Friend");
+    var stranger = signUp("Stranger");
+    befriend(author, friend);
+
+    var url = uploadImage(author.token());
+    var first = post("/stories", Map.of("mediaUrl", url, "body", "Hello"), author.token());
+    var second = post("/stories", Map.of("body", "Text", "background", "#112233,#445566"), author.token());
+    assertThatThrownBy(() -> post("/stories", Map.of("body", " "), author.token()))
+        .hasMessageContaining("empty_story");
+
+    var stories = get("/stories", friend.token(), LIST);
+    assertThat(stories).hasSize(1);
+    var items = (List<Map<String, Object>>) stories.getFirst().get("items");
+    assertThat(items).extracting(i -> i.get("id")).containsExactly(first.get("id"), second.get("id"));
+    assertThat(items).extracting(i -> i.get("seen")).containsExactly(false, false);
+    assertThat(get("/stories", stranger.token(), LIST)).isEmpty();
+    assertThat(get("/stories", author.token(), LIST)).hasSize(1);
+
+    var view = "/stories/items/" + first.get("id") + "/view";
+    assertThatThrownBy(() -> post(view, null, stranger.token()))
+        .isInstanceOf(HttpClientErrorException.NotFound.class);
+    post(view, null, friend.token());
+    post(view, null, friend.token()); // twice is fine
+    post(view, null, author.token()); // mine: not counted
+    items = (List<Map<String, Object>>) get("/stories", friend.token(), LIST).getFirst().get("items");
+    assertThat(items).extracting(i -> i.get("seen")).containsExactly(true, false);
+    assertThat(jdbc.queryForObject("select count(*) from story_views where item_id = ?", Long.class, first.get("id")))
+        .isEqualTo(1);
+
+    // The first slide expires: it leaves the list at once, the cleanup deletes it and its photo.
+    jdbc.update("update story_items set expires_at = systimestamp - interval '1' minute where id = ?", first.get("id"));
+    items = (List<Map<String, Object>>) get("/stories", friend.token(), LIST).getFirst().get("items");
+    assertThat(items).extracting(i -> i.get("id")).containsExactly(second.get("id"));
+    assertThatThrownBy(() -> post(view, null, friend.token())).isInstanceOf(HttpClientErrorException.NotFound.class);
+    storyService.removeExpired();
+    assertThat(jdbc.queryForObject("select count(*) from story_items where id = ?", Long.class, first.get("id")))
+        .isZero();
+    assertThat(jdbc.queryForObject("select count(*) from media where id = ?", Long.class,
+        url.substring(url.lastIndexOf('/') + 1))).isZero();
+  }
+
+  @Test
+  void socialEventsAreLive() throws Exception {
+    var author = signUp("Author");
+    var friend = signUp("Friend");
+    befriend(author, friend);
+    var events = listen(friend);
+
+    var created = post("/posts", Map.of("body", "Live"), author.token());
+    assertThat(((Map<String, Object>) next(events, "post.new").get("data")).get("body")).isEqualTo("Live");
+    put("/posts/" + created.get("id") + "/reaction", Map.of("type", "haha"), author.token());
+    var reaction = (Map<String, Object>) next(events, "post.reaction").get("data");
+    assertThat(reaction.get("type")).isEqualTo("haha");
+    assertThat(reaction.get("reactions")).isEqualTo(1);
+    post("/posts/" + created.get("id") + "/comments", Map.of("body", "Yo"), author.token());
+    assertThat(((Map<String, Object>) next(events, "post.comment").get("data")).get("commentCount")).isEqualTo(1);
+    post("/stories", Map.of("body", "Hi"), author.token());
+    var story = (Map<String, Object>) next(events, "story.new").get("data");
+    assertThat(((Number) story.get("userId")).longValue()).isEqualTo(author.id());
   }
 }

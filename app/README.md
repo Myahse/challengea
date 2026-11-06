@@ -1,7 +1,9 @@
 # Challengea — Flutter app (prototype)
 
-Prototype of the **Challengea** screens (MOBILE section of the Figma file
-"Challengea - N'TERI"; the NTERI part of that file is a separate project).
+The look of the app (colors, type, bubbles, glass, motion) is described in
+`../DESIGN.md`. It follows the phone's light or dark setting. The older
+screen notes below still describe what each page does, but no longer what it
+looks like: navigation is the floating menu (Home, Chats, +, Videos, Map).
 
 1. **Chat home** — the bubble chats described below; `+` opens Map / New group / Add friend
 2. **Conversation** — 1-to-1 and group chat (tap the name for the profile): text, **photos** (gallery or camera, tap to zoom), **voice notes** (hold the mic, slide left to cancel) and **stickers**
@@ -43,8 +45,10 @@ Prototype of the **Challengea** screens (MOBILE section of the Figma file
    The friend's moves are simulated for now; online matches need the backend
    (invites by push notification, moves over WebSocket).
 
-Videos and photos are animated colour placeholders until the backend stores
-real media (then `video_player` / cached images replace `FakeVideo`).
+Signed in, the home feed (posts, reactions, comments) and stories come from
+the server: friends see them, with live updates. The Videos page still shows
+demo content: animated colour placeholders until the backend stores real
+videos (then `video_player` replaces `FakeVideo`).
 
 **Two maps, same screen:**
 - Installed app (Android / iOS): real **OpenStreetMap** map (`flutter_map`)
@@ -133,4 +137,5 @@ screen ("Test server: your code is …").
 - `lib/games/` — games list, challenge flow, Sudoku duel, Four in a row (logic is in `*_logic.dart`, tested)
 - `lib/api/` — API client, saved session, live events (STOMP), `online.dart` keeps the app in sync with the server
 - `lib/screens/sign_in_screen.dart` — phone / email sign-in
-- `lib/theme.dart` — colors and text styles from Figma (one place to update)
+- `lib/theme.dart` — colors and text styles, light and dark (one place to update)
+- `lib/widgets/glass.dart` — frosted surfaces, glossy bubbles, text links

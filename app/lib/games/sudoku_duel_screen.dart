@@ -236,7 +236,7 @@ class _SudokuDuelScreenState extends State<SudokuDuelScreen> {
       context: context,
       barrierDismissible: false,
       builder: (ctx) => AlertDialog(
-        backgroundColor: Colors.white,
+        backgroundColor: AppColors.card,
         title: Text(
           won ? 'You win! 🏆' : '$f wins',
           textAlign: TextAlign.center,
@@ -253,7 +253,7 @@ class _SudokuDuelScreenState extends State<SudokuDuelScreen> {
             child: const Text('Back'),
           ),
           FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: AppColors.ink),
+            style: FilledButton.styleFrom(backgroundColor: AppColors.accent),
             onPressed: () {
               Navigator.pop(ctx);
               if (_m != null) {
@@ -287,10 +287,10 @@ class _SudokuDuelScreenState extends State<SudokuDuelScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: AppColors.card,
       appBar: AppBar(
-        backgroundColor: Colors.white,
-        surfaceTintColor: Colors.white,
+        backgroundColor: AppColors.card,
+        surfaceTintColor: Colors.transparent,
         centerTitle: true,
         title: Column(
           children: [
@@ -333,7 +333,7 @@ class _SudokuDuelScreenState extends State<SudokuDuelScreen> {
                           : Icons.favorite_rounded,
                       size: 18,
                       color: i < _mistakes
-                          ? const Color(0xFFE5484D)
+                          ? AppColors.danger
                           : const Color(0xFFFF8FA3),
                     ),
                   ),
@@ -433,7 +433,7 @@ class _SudokuDuelScreenState extends State<SudokuDuelScreen> {
     final same = v != 0 && v == selValue;
     final wrong = _wrong.contains(i);
     const thin = BorderSide(color: Color(0xFFCFCFCF), width: .6);
-    const thick = BorderSide(color: AppColors.ink, width: 1.6);
+    final thick = BorderSide(color: AppColors.ink, width: 1.6);
     return GestureDetector(
       onTap: () => setState(() => _selected = i),
       child: AnimatedContainer(
@@ -444,7 +444,7 @@ class _SudokuDuelScreenState extends State<SudokuDuelScreen> {
               : same
               ? const Color(0xFFDDF3E2)
               : related
-              ? const Color(0xFFF3F3F3)
+              ? AppColors.page
               : Colors.white,
           border: Border(
             right: c == 8 ? BorderSide.none : (c % 3 == 2 ? thick : thin),
@@ -471,7 +471,7 @@ class _SudokuDuelScreenState extends State<SudokuDuelScreen> {
                         22,
                         weight: given ? FontWeight.w700 : FontWeight.w500,
                         color: wrong
-                            ? const Color(0xFFE5484D)
+                            ? AppColors.danger
                             : (given ? AppColors.ink : const Color(0xFF1F6FEB)),
                       ),
                     ),
@@ -500,9 +500,7 @@ class _SudokuDuelScreenState extends State<SudokuDuelScreen> {
                   child: Padding(
                     padding: const EdgeInsets.all(2),
                     child: Material(
-                      color: left(d) <= 0
-                          ? const Color(0xFFF5F5F5)
-                          : AppColors.bubble,
+                      color: left(d) <= 0 ? AppColors.page : AppColors.bubble,
                       borderRadius: BorderRadius.circular(10),
                       child: InkWell(
                         borderRadius: BorderRadius.circular(10),
@@ -534,16 +532,13 @@ class _SudokuDuelScreenState extends State<SudokuDuelScreen> {
             children: [
               TextButton.icon(
                 onPressed: () => _enter(0),
-                icon: const Icon(
-                  Icons.backspace_outlined,
-                  color: AppColors.ink,
-                ),
+                icon: Icon(Icons.backspace_outlined, color: AppColors.ink),
                 label: Text('Erase', style: tx(14, weight: FontWeight.w600)),
               ),
               if (_m == null)
                 TextButton.icon(
                   onPressed: _hints == 0 ? null : _hint,
-                  icon: const Icon(
+                  icon: Icon(
                     Icons.lightbulb_outline_rounded,
                     color: AppColors.ink,
                   ),

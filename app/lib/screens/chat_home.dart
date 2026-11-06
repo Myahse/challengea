@@ -8,11 +8,13 @@ import '../theme.dart';
 import '../widgets/avatar.dart';
 import '../widgets/bubble_field.dart';
 import '../widgets/friends_sheet.dart';
+import '../widgets/glass.dart';
 import '../widgets/motion.dart';
 import 'chat_screen.dart';
 import 'profile_screen.dart';
 
-/// Figma: "Chat page" (node 28:144).
+/// The signature page: friends as glossy bubbles on black. Drag one onto
+/// another to make a group; the list view is one tap away.
 class ChatHome extends StatefulWidget {
   const ChatHome({super.key, required this.store, this.onOpenMap});
   final ChatStore store;
@@ -96,7 +98,7 @@ class _ChatHomeState extends State<ChatHome> {
     showModalBottomSheet(
       context: context,
       showDragHandle: true,
-      backgroundColor: Colors.white,
+      backgroundColor: AppColors.card,
       builder: (ctx) => ListenableBuilder(
         listenable: store,
         builder: (ctx, _) {
@@ -155,7 +157,7 @@ class _ChatHomeState extends State<ChatHome> {
                       Expanded(
                         child: FilledButton.icon(
                           style: FilledButton.styleFrom(
-                            backgroundColor: AppColors.ink,
+                            backgroundColor: AppColors.accent,
                           ),
                           icon: const Icon(Icons.chat_bubble_rounded, size: 18),
                           label: const Text('Open chat'),
@@ -183,7 +185,7 @@ class _ChatHomeState extends State<ChatHome> {
       context: context,
       isScrollControlled: true,
       showDragHandle: true,
-      backgroundColor: Colors.white,
+      backgroundColor: AppColors.card,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setSheet) => SafeArea(
           child: ConstrainedBox(
@@ -225,7 +227,7 @@ class _ChatHomeState extends State<ChatHome> {
                     height: 48,
                     child: FilledButton(
                       style: FilledButton.styleFrom(
-                        backgroundColor: AppColors.ink,
+                        backgroundColor: AppColors.accent,
                       ),
                       onPressed: picked.length < 2
                           ? null
@@ -274,31 +276,37 @@ class _ChatHomeState extends State<ChatHome> {
   Widget build(BuildContext context) {
     final top = MediaQuery.paddingOf(context).top;
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: AppColors.page,
       body: ListenableBuilder(
         listenable: store,
         builder: (context, _) {
           final unread = store.nodes.where((n) => n.unread > 0).length;
+          final list = _list || _query.isNotEmpty;
           return Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               // Header: me, title, friends, Bubbles / List switch.
               Padding(
-                padding: EdgeInsets.fromLTRB(16, top + 8, 10, 0),
+                padding: EdgeInsets.fromLTRB(20, top + 8, 12, 0),
                 child: Row(
                   children: [
-                    Pressable(
-                      onTap: () =>
-                          ProfileScreen.open(context, store, store.feed.me),
-                      child: PersonAvatar(store.me, diameter: 38),
+                    Tooltip(
+                      message: 'My profile',
+                      child: Pressable(
+                        scale: .9,
+                        onTap: () =>
+                            ProfileScreen.open(context, store, store.feed.me),
+                        child: PersonAvatar(store.me, diameter: 34),
+                      ),
                     ),
                     const SizedBox(width: 10),
                     Text(
                       'Chats',
                       style: tx(
-                        28,
-                        weight: FontWeight.w800,
-                      ).copyWith(letterSpacing: -.8),
+                        20,
+                        weight: FontWeight.w600,
+                        color: AppColors.ink,
+                      ),
                     ),
                     const Spacer(),
                     if (store.online != null)
@@ -310,7 +318,11 @@ class _ChatHomeState extends State<ChatHome> {
                           isLabelVisible:
                               (store.online?.incoming.length ?? 0) > 0,
                           label: Text('${store.online?.incoming.length ?? 0}'),
-                          child: const Icon(Icons.person_add_alt_1_outlined),
+                          backgroundColor: AppColors.accent,
+                          child: Icon(
+                            Icons.person_add_alt_1_outlined,
+                            color: AppColors.ink,
+                          ),
                         ),
                       ),
                     _ViewSwitch(
@@ -320,74 +332,12 @@ class _ChatHomeState extends State<ChatHome> {
                   ],
                 ),
               ),
-              // Search + filters (WhatsApp).
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
-                child: TextField(
-                  onChanged: (v) => setState(() => _query = v),
-                  style: tx(15),
-                  decoration: InputDecoration(
-                    isDense: true,
-                    prefixIcon: const Icon(
-                      Icons.search_rounded,
-                      color: AppColors.muted,
-                    ),
-                    hintText: 'Search',
-                    hintStyle: tx(15, color: AppColors.muted),
-                    filled: true,
-                    fillColor: AppColors.page,
-                    contentPadding: const EdgeInsets.symmetric(vertical: 12),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(24),
-                      borderSide: BorderSide.none,
-                    ),
-                  ),
-                ),
-              ),
-              SizedBox(
-                height: 48,
-                child: ListView(
-                  scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
-                  children: [
-                    for (final f in ['All', 'Unread', 'Groups'])
-                      Padding(
-                        padding: const EdgeInsets.only(right: 8),
-                        child: Pressable(
-                          onTap: () => setState(() {
-                            _filter = f;
-                            // Filters show the list.
-                            if (f != 'All') {
-                              _list = true;
-                            }
-                          }),
-                          child: AnimatedContainer(
-                            duration: Motion.fast,
-                            padding: const EdgeInsets.symmetric(horizontal: 16),
-                            alignment: Alignment.center,
-                            decoration: BoxDecoration(
-                              color: _filter == f
-                                  ? const Color(0xFFDDF7E3)
-                                  : AppColors.page,
-                              borderRadius: BorderRadius.circular(18),
-                            ),
-                            child: Text(
-                              f == 'Unread' && unread > 0
-                                  ? 'Unread $unread'
-                                  : f,
-                              style: tx(
-                                13,
-                                weight: FontWeight.w700,
-                                color: _filter == f
-                                    ? const Color(0xFF0F7B36)
-                                    : const Color(0xFF555555),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
+              // Bubbles: the headline. List: search and filters.
+              AnimatedSize(
+                duration: Motion.normal,
+                curve: Motion.ease,
+                alignment: Alignment.topCenter,
+                child: list ? _listHeader(unread) : _hero(),
               ),
               Expanded(
                 child: AnimatedSwitcher(
@@ -396,11 +346,11 @@ class _ChatHomeState extends State<ChatHome> {
                   transitionBuilder: (child, a) => FadeTransition(
                     opacity: a,
                     child: ScaleTransition(
-                      scale: Tween(begin: .97, end: 1.0).animate(a),
+                      scale: Tween(begin: .96, end: 1.0).animate(a),
                       child: child,
                     ),
                   ),
-                  child: _list || _query.isNotEmpty
+                  child: list
                       ? KeyedSubtree(
                           key: const ValueKey('list'),
                           child: _chatList(),
@@ -418,6 +368,87 @@ class _ChatHomeState extends State<ChatHome> {
     );
   }
 
+  Widget _hero() => Padding(
+    padding: const EdgeInsets.fromLTRB(24, 18, 24, 0),
+    child: FadeSlideIn(
+      child: Column(
+        children: [
+          Text(
+            'Bring them\ntogether.',
+            textAlign: TextAlign.center,
+            style: tx(44, weight: FontWeight.w600, color: AppColors.ink),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Drop one friend on another.',
+            textAlign: TextAlign.center,
+            style: tx(17, color: AppColors.muted),
+          ),
+        ],
+      ),
+    ),
+  );
+
+  Widget _listHeader(int unread) => Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      Padding(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+        child: TextField(
+          onChanged: (v) => setState(() => _query = v),
+          style: tx(16, color: AppColors.ink),
+          cursorColor: AppColors.link,
+          decoration: InputDecoration(
+            isDense: true,
+            prefixIcon: Icon(Icons.search_rounded, color: AppColors.muted),
+            hintText: 'Search',
+            hintStyle: tx(16, color: AppColors.muted),
+            filled: true,
+            fillColor: AppColors.card,
+            contentPadding: const EdgeInsets.symmetric(vertical: 13),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(24),
+              borderSide: BorderSide.none,
+            ),
+          ),
+        ),
+      ),
+      SizedBox(
+        height: 56,
+        child: ListView(
+          scrollDirection: Axis.horizontal,
+          padding: const EdgeInsets.fromLTRB(16, 10, 16, 6),
+          children: [
+            for (final f in ['All', 'Unread', 'Groups'])
+              Padding(
+                padding: const EdgeInsets.only(right: 8),
+                child: Pressable(
+                  onTap: () => setState(() => _filter = f),
+                  child: AnimatedContainer(
+                    duration: Motion.fast,
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: _filter == f ? AppColors.ink : AppColors.card,
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(
+                      f == 'Unread' && unread > 0 ? 'Unread $unread' : f,
+                      style: tx(
+                        14,
+                        weight: FontWeight.w500,
+                        color: _filter == f ? AppColors.onInk : AppColors.ink,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    ],
+  );
+
   /// WhatsApp-style rows: avatar, name, last message, time, unread badge.
   Widget _chatList() {
     final chats = _sorted();
@@ -425,7 +456,7 @@ class _ChatHomeState extends State<ChatHome> {
       return Center(
         child: Text(
           _query.isEmpty ? 'No chats here yet' : 'No match for "$_query"',
-          style: tx(14, color: AppColors.muted),
+          style: tx(15, color: AppColors.muted),
         ),
       );
     }
@@ -451,24 +482,12 @@ class _ChatHomeState extends State<ChatHome> {
       children: [
         Positioned.fill(
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(8, 18, 8, 100),
+            padding: const EdgeInsets.fromLTRB(8, 8, 8, 96),
             child: BubbleField(
               store: store,
               onOpen: _open,
               onLongPress: _longPress,
               onMerged: _onMerged,
-            ),
-          ),
-        ),
-        Positioned(
-          left: 0,
-          right: 0,
-          top: 2,
-          child: IgnorePointer(
-            child: Text(
-              'Drag a bubble onto another to make a group',
-              textAlign: TextAlign.center,
-              style: tx(12, color: AppColors.muted),
             ),
           ),
         ),
@@ -521,16 +540,16 @@ class _ViewSwitch extends StatelessWidget {
             onTap: onTap,
             child: AnimatedContainer(
               duration: Motion.fast,
-              width: 40,
-              height: 34,
+              width: 44,
+              height: 38,
               decoration: BoxDecoration(
                 color: selected ? AppColors.ink : Colors.transparent,
-                borderRadius: BorderRadius.circular(17),
+                borderRadius: BorderRadius.circular(19),
               ),
               child: Icon(
                 icon,
                 size: 19,
-                color: selected ? Colors.white : AppColors.ink,
+                color: selected ? AppColors.onInk : AppColors.ink,
               ),
             ),
           ),
@@ -538,8 +557,8 @@ class _ViewSwitch extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(3),
       decoration: BoxDecoration(
-        color: AppColors.page,
-        borderRadius: BorderRadius.circular(20),
+        color: AppColors.card,
+        borderRadius: BorderRadius.circular(22),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -557,7 +576,7 @@ class _ViewSwitch extends StatelessWidget {
   }
 }
 
-/// One WhatsApp-style chat row.
+/// One chat row, on black.
 class _ChatRow extends StatelessWidget {
   const _ChatRow({
     required this.node,
@@ -630,7 +649,7 @@ class _ChatRow extends StatelessWidget {
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
                           color: AppColors.online,
-                          border: Border.all(color: Colors.white, width: 2.5),
+                          border: Border.all(color: AppColors.page, width: 2.5),
                         ),
                       ),
                     ),
@@ -650,8 +669,9 @@ class _ChatRow extends StatelessWidget {
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: tx(
-                            16,
-                            weight: bold ? FontWeight.w800 : FontWeight.w600,
+                            17,
+                            weight: FontWeight.w600,
+                            color: AppColors.ink,
                           ),
                         ),
                       ),
@@ -659,11 +679,8 @@ class _ChatRow extends StatelessWidget {
                         Text(
                           _time(last.time),
                           style: tx(
-                            12,
-                            weight: bold ? FontWeight.w700 : FontWeight.w400,
-                            color: bold
-                                ? const Color(0xFF0F9D58)
-                                : AppColors.muted,
+                            13,
+                            color: bold ? AppColors.link : AppColors.muted,
                           ),
                         ),
                     ],
@@ -674,12 +691,12 @@ class _ChatRow extends StatelessWidget {
                       if (last != null &&
                           last.isMine &&
                           last.kind == MessageKind.text)
-                        const Padding(
+                        Padding(
                           padding: EdgeInsets.only(right: 4),
                           child: Icon(
                             Icons.done_all_rounded,
                             size: 16,
-                            color: Color(0xFF34B7F1),
+                            color: AppColors.link,
                           ),
                         ),
                       Expanded(
@@ -692,8 +709,7 @@ class _ChatRow extends StatelessWidget {
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: tx(
-                            14,
-                            weight: bold ? FontWeight.w600 : FontWeight.w400,
+                            15,
                             color: bold ? AppColors.ink : AppColors.muted,
                           ),
                         ),
@@ -710,7 +726,7 @@ class _ChatRow extends StatelessWidget {
                             padding: const EdgeInsets.symmetric(horizontal: 6),
                             alignment: Alignment.center,
                             decoration: BoxDecoration(
-                              color: const Color(0xFF25D366),
+                              color: AppColors.accent,
                               borderRadius: BorderRadius.circular(11),
                             ),
                             child: Text(
@@ -735,7 +751,7 @@ class _ChatRow extends StatelessWidget {
   }
 }
 
-/// The "+" button: opens three small actions in an arc (Figma frame 20:55).
+/// The "+" button: opens three small actions in an arc.
 class _SpeedDial extends StatefulWidget {
   const _SpeedDial({
     required this.onMap,
@@ -791,7 +807,7 @@ class _SpeedDialState extends State<_SpeedDial>
       child: AnimatedBuilder(
         animation: _anim,
         builder: (context, _) {
-          final t = Curves.easeOutBack.transform(_anim.value);
+          final t = Motion.spring.transform(_anim.value);
           return Stack(
             clipBehavior: Clip.none,
             children: [
@@ -813,9 +829,9 @@ class _SpeedDialState extends State<_SpeedDial>
                             customBorder: const CircleBorder(),
                             onTap: () => _run(action),
                             child: SizedBox(
-                              width: 44,
-                              height: 44,
-                              child: Icon(icon, size: 22),
+                              width: 46,
+                              height: 46,
+                              child: Icon(icon, size: 22, color: AppColors.ink),
                             ),
                           ),
                         ),
@@ -837,7 +853,7 @@ class _SpeedDialState extends State<_SpeedDial>
                       height: 50,
                       child: Transform.rotate(
                         angle: _anim.value * pi / 4,
-                        child: const Icon(Icons.add, size: 32),
+                        child: Icon(Icons.add, size: 28, color: AppColors.ink),
                       ),
                     ),
                   ),
@@ -876,10 +892,10 @@ class _EmptyFriendsState extends State<_EmptyFriends>
   @override
   Widget build(BuildContext context) {
     const colors = [
-      Color(0xFFF06BA8),
-      Color(0xFF4FB3F6),
-      Color(0xFF5CC98A),
-      Color(0xFFFFC53D),
+      Color(0xFFD0468C),
+      Color(0xFF2F8FE0),
+      Color(0xFF36A86B),
+      Color(0xFFE5A52A),
     ];
     return FadeSlideIn(
       delay: const Duration(milliseconds: 250),
@@ -887,7 +903,7 @@ class _EmptyFriendsState extends State<_EmptyFriends>
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           SizedBox(
-            width: 220,
+            width: 240,
             height: 140,
             child: AnimatedBuilder(
               animation: _float,
@@ -895,20 +911,11 @@ class _EmptyFriendsState extends State<_EmptyFriends>
                 children: [
                   for (var i = 0; i < 4; i++)
                     Positioned(
-                      left: 20.0 + i * 46,
+                      left: 20.0 + i * 50,
                       top: 40 + 18 * sin(_float.value * 2 * pi + i * 1.4),
-                      child: Container(
-                        width: 52.0 - (i.isOdd ? 12 : 0),
-                        height: 52.0 - (i.isOdd ? 12 : 0),
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          gradient: RadialGradient(
-                            colors: [
-                              colors[i].withValues(alpha: .9),
-                              colors[i].withValues(alpha: .45),
-                            ],
-                          ),
-                        ),
+                      child: Orb(
+                        color: colors[i],
+                        diameter: 56.0 - (i.isOdd ? 12 : 0),
                       ),
                     ),
                 ],
@@ -916,14 +923,14 @@ class _EmptyFriendsState extends State<_EmptyFriends>
             ),
           ),
           Text(
-            'Your bubbles live here',
-            style: tx(20, weight: FontWeight.w800),
+            'Your bubbles live here.',
+            style: tx(28, weight: FontWeight.w600, color: AppColors.ink),
           ),
           const SizedBox(height: 6),
           Text(
             'Add friends: each one becomes a bubble you can\nchat with, merge into groups and challenge.',
             textAlign: TextAlign.center,
-            style: tx(14, color: AppColors.muted),
+            style: tx(15, color: AppColors.muted),
           ),
           const SizedBox(height: 18),
           Pressable(
@@ -931,7 +938,7 @@ class _EmptyFriendsState extends State<_EmptyFriends>
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 26, vertical: 14),
               decoration: BoxDecoration(
-                color: AppColors.ink,
+                color: AppColors.accent,
                 borderRadius: BorderRadius.circular(30),
               ),
               child: Row(

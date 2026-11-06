@@ -6,6 +6,9 @@ import com.challengea.api.chat.Conversation;
 import com.challengea.api.chat.ConversationMember;
 import com.challengea.api.friend.Friendship;
 import com.challengea.api.location.UserLocation;
+import com.challengea.api.social.Post;
+import com.challengea.api.social.Story;
+import com.challengea.api.social.StoryItem;
 import com.challengea.api.user.User;
 import com.challengea.api.user.UserRepository;
 import jakarta.persistence.EntityManager;
@@ -43,6 +46,40 @@ public class MockDataLoader implements ApplicationRunner {
       seed(encoder.encode(PASSWORD));
     }
     shareWithLonelyAccounts();
+    seedSocial();
+  }
+
+  /** A few posts, and stories again whenever the last ones have expired. */
+  private void seedSocial() {
+    if (em.createQuery("select count(p) from Post p", Long.class).getSingleResult() == 0) {
+      post("melanie", "Grand March\u00e9 de Marcory ce matin, les prix ont encore mont\u00e9 !", null);
+      post("marc", "Sudoku en 3:12. Qui veut me d\u00e9fier ?", "#B5E48C,#1A759F");
+      post("awa", "Pause caf\u00e9 en Zone 4 \u2615", null);
+      post("brendon", "Rematch ce soir, soyez pr\u00eats.", "#A0C4FF,#5E60CE");
+    }
+    var active = em.createQuery("select count(i) from StoryItem i where i.expiresAt > CURRENT_TIMESTAMP", Long.class)
+        .getSingleResult();
+    if (active == 0) {
+      storySlide("melanie", "Nouvelle tenue pour dimanche", "#FFC8DD,#B5179E");
+      storySlide("marc", "Lagune \u00c9bri\u00e9 ce soir", "#2B2D42,#8D99AE");
+      storySlide("awa", "Coffee break", "#ADE8F4,#0077B6");
+    }
+  }
+
+  private void post(String handle, String body, String background) {
+    em.persist(new Post(byEmail(handle + "@mock.challengea").getId(), body, null, background));
+  }
+
+  private void storySlide(String handle, String body, String background) {
+    var userId = byEmail(handle + "@mock.challengea").getId();
+    var story = em.createQuery("select s from Story s where s.userId = :id", Story.class)
+        .setParameter("id", userId).getResultStream().findFirst().orElse(null);
+    if (story == null) {
+      story = new Story(userId);
+      em.persist(story);
+    }
+    story.touch();
+    em.persist(new StoryItem(story.getId(), body, null, background));
   }
 
   /** Gives the Marcory cast to any real account that has no friends yet. */

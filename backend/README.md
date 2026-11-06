@@ -1,8 +1,9 @@
 # Challengea API (Spring Boot + Oracle Database 23ai)
 
 Backend for the Challengea Flutter app: accounts, friends, chats (1-to-1 and
-groups made by merging bubbles), the friends map, and server-checked 1 vs 1
-games. Real-time events go over WebSocket.
+groups made by merging bubbles), stories, the home feed (posts, reactions,
+comments), the friends map, and server-checked 1 vs 1 games. Real-time events
+go over WebSocket.
 
 | | |
 |---|---|
@@ -100,6 +101,31 @@ All four return `{token, user, isNew}`.
 | GET | `/api/media/{id}` | The file (no token: the random id is the secret) |
 | PUT | `/api/bubbles` | `{items: [{conversationId, x, y}]}` (0..1) |
 
+### Stories
+
+You see your own stories and your friends'. Each slide lasts 24 h; expired
+slides leave the list at once, and an hourly job deletes them and their photos.
+
+| Method | Path | |
+|---|---|---|
+| GET | `/api/stories` | `[{user, items: [{id, body, mediaUrl, background, createdAt, expiresAt, seen}]}]`, most recent first, slides in order |
+| POST | `/api/stories` | `{body?, mediaUrl?, background?}`: add a slide. Needs text (max 500) or a photo uploaded to `/api/media` |
+| POST | `/api/stories/items/{id}/view` | I saw this slide (nothing changes for my own, or twice) |
+
+`background` is the gradient of a text card: 2 to 8 comma-separated `#RRGGBB` colours.
+
+### Home feed
+
+You see your own posts and your friends'. Anything else answers `not_found`.
+
+| Method | Path | |
+|---|---|---|
+| GET | `/api/posts?before=&limit=` | Newest first, page with `before` = oldest id you have. `[{id, author, body, mediaUrl, background, reactions, myReaction, commentCount, createdAt}]` |
+| POST | `/api/posts` | `{body?, mediaUrl?, background?}`. Needs text (max 4000) or a photo |
+| PUT | `/api/posts/{id}/reaction` | `{type}`: `like`, `love`, `haha`, `wow`, `sad`, `angry`; `null` removes mine. One per person, returns the post |
+| GET | `/api/posts/{id}/comments` | Oldest first: `[{id, postId, parentId, author, body, createdAt}]` |
+| POST | `/api/posts/{id}/comments` | `{body, parentId?}`. Replies are one level deep: answering a reply joins its thread |
+
 ### Map
 
 | Method | Path | |
@@ -161,7 +187,8 @@ in the CONNECT frame, subscribe to `/user/queue/events`. Each event is
 `message.new`, `message.read`, `conversation.added`, `conversation.updated`,
 `conversation.removed`, `friend.request`, `friend.accepted`,
 `location.updated`, `location.hidden`, `match.invited`, `match.updated`,
-`call.incoming`, `call.updated`, `call.declined`, `call.ended`.
+`call.incoming`, `call.updated`, `call.declined`, `call.ended`, `story.new`,
+`post.new`, `post.reaction`, `post.comment`.
 
 ## Not done yet
 
@@ -173,4 +200,5 @@ in the CONNECT frame, subscribe to `/user/queue/events`. Each event is
 - **Calls at scale**: who is in a call is kept in the API's memory (one
   instance); use LiveKit webhooks when running several instances. Production
   LiveKit needs a public IP / TURN server for phones on mobile networks.
-- **Videos, comments, shop and payments** (CinetPay / Wave / mobile money).
+- **Videos, shop and payments** (CinetPay / Wave / mobile money).
+- **Comment likes** stay on the phone; they are not saved yet.

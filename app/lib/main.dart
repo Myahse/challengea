@@ -92,17 +92,19 @@ class ChallengeaApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Challengea',
-      debugShowCheckedModeBanner: false,
-      theme: buildTheme(),
-      navigatorKey: _navigator,
-      builder: (context, child) =>
-          CallBanner(store: store, navigatorKey: _navigator, child: child!),
-      home: AnimatedSwitcher(
-        duration: const Duration(milliseconds: 450),
-        switchInCurve: Curves.easeOutCubic,
-        child: KeyedSubtree(key: ValueKey(home.runtimeType), child: home),
+    return FollowDeviceTheme(
+      builder: (context) => MaterialApp(
+        title: 'Challengea',
+        debugShowCheckedModeBanner: false,
+        theme: buildTheme(),
+        navigatorKey: _navigator,
+        builder: (context, child) =>
+            CallBanner(store: store, navigatorKey: _navigator, child: child!),
+        home: AnimatedSwitcher(
+          duration: const Duration(milliseconds: 450),
+          switchInCurve: Curves.easeOutCubic,
+          child: KeyedSubtree(key: ValueKey(home.runtimeType), child: home),
+        ),
       ),
     );
   }
@@ -113,12 +115,9 @@ class _Splash extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    backgroundColor: Colors.white,
+    backgroundColor: AppColors.page,
     body: Center(
-      child: Text(
-        'Challengea',
-        style: tx(36, weight: FontWeight.w800).copyWith(letterSpacing: -1.2),
-      ),
+      child: Text('Challengea', style: tx(36, weight: FontWeight.w600)),
     ),
   );
 }

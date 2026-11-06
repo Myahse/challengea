@@ -9,11 +9,12 @@ import '../theme.dart';
 import '../widgets/avatar.dart';
 import '../widgets/comments_sheet.dart';
 import '../widgets/fake_video.dart';
+import '../widgets/glass.dart';
 import '../widgets/motion.dart';
 import '../widgets/product_sheet.dart';
 import 'profile_screen.dart';
 
-/// Figma: video frames 48:261 / 48:331, live with products 57:220.
+/// Full-screen videos under quiet glass controls.
 /// Swipe up for the next video, double-tap to like, tap to pause.
 class VideoFeed extends StatefulWidget {
   const VideoFeed({
@@ -134,7 +135,7 @@ class _VideoFeedState extends State<VideoFeed> {
                     height: 8,
                     decoration: const BoxDecoration(
                       shape: BoxShape.circle,
-                      color: Color(0xFFE5484D),
+                      color: AppColors.danger,
                     ),
                   ),
                   const SizedBox(width: 6),
@@ -162,7 +163,7 @@ class _VideoFeedState extends State<VideoFeed> {
                   icon: const Icon(
                     Icons.search_rounded,
                     color: Colors.white,
-                    size: 32,
+                    size: 28,
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -173,13 +174,13 @@ class _VideoFeedState extends State<VideoFeed> {
             Positioned(
               left: 0,
               right: 0,
-              top: top + 20,
+              top: top + 10,
               child: widget.following == null || widget.pushed
                   ? IgnorePointer(
                       child: Text(
                         'Video',
                         textAlign: TextAlign.center,
-                        style: tx(16, color: Colors.white),
+                        style: tx(17, color: Colors.white),
                       ),
                     )
                   : Row(
@@ -190,12 +191,7 @@ class _VideoFeedState extends State<VideoFeed> {
                           _followingTab,
                           () => _switchTab(true),
                         ),
-                        Container(
-                          width: 1,
-                          height: 14,
-                          margin: const EdgeInsets.symmetric(horizontal: 6),
-                          color: Colors.white38,
-                        ),
+                        const SizedBox(width: 4),
                         _tab(
                           'For you',
                           !_followingTab,
@@ -213,32 +209,24 @@ class _VideoFeedState extends State<VideoFeed> {
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            AnimatedDefaultTextStyle(
-              duration: const Duration(milliseconds: 180),
-              style: tx(
-                selected ? 17 : 16,
-                weight: selected ? FontWeight.w700 : FontWeight.w500,
-                color: selected ? Colors.white : Colors.white60,
-              ),
-              child: Text(label),
-            ),
-            const SizedBox(height: 4),
-            AnimatedContainer(
-              duration: const Duration(milliseconds: 220),
-              curve: Curves.easeOutCubic,
-              width: selected ? 22 : 0,
-              height: 3,
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-          ],
+      child: AnimatedContainer(
+        duration: Motion.fast,
+        height: 44,
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: selected
+              ? Colors.white.withValues(alpha: .2)
+              : Colors.transparent,
+          borderRadius: BorderRadius.circular(22),
+        ),
+        child: Text(
+          label,
+          style: tx(
+            16,
+            weight: selected ? FontWeight.w600 : FontWeight.w400,
+            color: Colors.white,
+          ),
         ),
       ),
     );
@@ -403,11 +391,11 @@ class _VideoPageState extends State<_VideoPage> with TickerProviderStateMixin {
               child: Transform.rotate(
                 angle: -.25 + .1 * sin(t * pi),
                 child: Transform.scale(
-                  scale: Curves.elasticOut.transform(min(1, t * 1.6)),
+                  scale: Curves.easeOutBack.transform(min(1, t * 1.8)),
                   child: const Icon(
                     Icons.favorite,
                     size: 100,
-                    color: Color(0xFFFF3B5C),
+                    color: Colors.white,
                   ),
                 ),
               ),
@@ -427,32 +415,40 @@ class _VideoPageState extends State<_VideoPage> with TickerProviderStateMixin {
       String? label,
     }) {
       return Padding(
-        padding: const EdgeInsets.only(bottom: 14),
+        padding: const EdgeInsets.only(bottom: 10),
         child: Semantics(
           button: true,
           label: label,
           child: Pressable(
             onTap: onTap,
-            scale: .8,
+            scale: .88,
             child: Column(
               children: [
-                // Icon swaps (liked / saved) with an elastic pop.
-                AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 450),
-                  transitionBuilder: (child, a) => ScaleTransition(
-                    scale: CurvedAnimation(parent: a, curve: Curves.elasticOut),
-                    child: child,
+                Container(
+                  width: 52,
+                  height: 52,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: color == Colors.white
+                        ? Colors.white.withValues(alpha: .18)
+                        : Colors.white,
                   ),
-                  child: Icon(
-                    icon,
-                    key: ValueKey('$icon$color'),
-                    color: color,
-                    size: 38,
-                    shadows: const [
-                      Shadow(color: Colors.black38, blurRadius: 8),
-                    ],
+                  child: AnimatedSwitcher(
+                    duration: Motion.normal,
+                    switchInCurve: Motion.ease,
+                    transitionBuilder: (child, a) => ScaleTransition(
+                      scale: Tween(begin: .5, end: 1.0).animate(a),
+                      child: FadeTransition(opacity: a, child: child),
+                    ),
+                    child: Icon(
+                      icon,
+                      key: ValueKey('$icon$color'),
+                      color: color,
+                      size: 24,
+                    ),
                   ),
                 ),
+                const SizedBox(height: 3),
                 AnimatedSwitcher(
                   duration: Motion.fast,
                   transitionBuilder: (child, a) => SlideTransition(
@@ -465,7 +461,7 @@ class _VideoPageState extends State<_VideoPage> with TickerProviderStateMixin {
                   child: Text(
                     count,
                     key: ValueKey(count),
-                    style: tx(12, weight: FontWeight.w600, color: Colors.white),
+                    style: tx(12, color: Colors.white),
                   ),
                 ),
               ],
@@ -481,7 +477,7 @@ class _VideoPageState extends State<_VideoPage> with TickerProviderStateMixin {
           post.liked ? Icons.favorite : Icons.favorite_border_rounded,
           compact(post.likes),
           () => feed.toggleLike(post),
-          color: post.liked ? const Color(0xFFFF3B5C) : Colors.white,
+          color: post.liked ? AppColors.danger : Colors.white,
           label: 'Like',
         ),
         action(
@@ -528,14 +524,7 @@ class _VideoPageState extends State<_VideoPage> with TickerProviderStateMixin {
             children: [
               GestureDetector(
                 onTap: _openProfile,
-                child: Container(
-                  padding: const EdgeInsets.all(2),
-                  decoration: const BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: Colors.white,
-                  ),
-                  child: PersonAvatar(author.person, diameter: 58),
-                ),
+                child: PersonAvatar(author.person, diameter: 46),
               ),
               const SizedBox(width: 12),
               Flexible(
@@ -544,35 +533,17 @@ class _VideoPageState extends State<_VideoPage> with TickerProviderStateMixin {
                   child: Text(
                     '@${author.handle}',
                     overflow: TextOverflow.ellipsis,
-                    style: tx(16, weight: FontWeight.w500, color: Colors.white),
+                    style: tx(17, weight: FontWeight.w600, color: Colors.white),
                   ),
                 ),
               ),
               const SizedBox(width: 12),
               if (!author.isMe)
-                GestureDetector(
+                TextLink(
+                  label: author.followed ? 'Following' : 'Follow',
+                  dark: true,
+                  chevron: false,
                   onTap: () => feed.toggleFollow(author),
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 200),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 8,
-                    ),
-                    decoration: BoxDecoration(
-                      color: author.followed
-                          ? Colors.white24
-                          : const Color(0xFFE3E3E3),
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    child: Text(
-                      author.followed ? 'Following' : 'Follow',
-                      style: tx(
-                        13,
-                        weight: FontWeight.w700,
-                        color: author.followed ? Colors.white : AppColors.ink,
-                      ),
-                    ),
-                  ),
                 ),
             ],
           ),
@@ -599,8 +570,8 @@ class _VideoPageState extends State<_VideoPage> with TickerProviderStateMixin {
   }
 
   Widget _caption() {
-    final white = tx(13, color: Colors.white);
-    final bold = tx(13, weight: FontWeight.w700, color: Colors.white);
+    final white = tx(16, color: Colors.white);
+    final bold = tx(16, weight: FontWeight.w600, color: Colors.white);
     List<InlineSpan> words(String text) => [
       for (final w in text.split(' '))
         TextSpan(
@@ -692,7 +663,7 @@ class _VideoPageState extends State<_VideoPage> with TickerProviderStateMixin {
               padding: const EdgeInsets.all(6),
               decoration: BoxDecoration(
                 color: Colors.white,
-                borderRadius: BorderRadius.circular(6),
+                borderRadius: BorderRadius.circular(22),
               ),
               child: Row(
                 children: [
@@ -700,7 +671,7 @@ class _VideoPageState extends State<_VideoPage> with TickerProviderStateMixin {
                     width: 80,
                     height: 80,
                     decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(4),
+                      borderRadius: BorderRadius.circular(16),
                       gradient: LinearGradient(colors: p.colors),
                     ),
                     child: const Icon(
@@ -744,7 +715,6 @@ class _VideoPageState extends State<_VideoPage> with TickerProviderStateMixin {
                     ),
                   ),
                   const SizedBox(width: 8),
-                  Container(width: 10, color: AppColors.ink),
                 ],
               ),
             ),
@@ -759,14 +729,14 @@ class _VideoPageState extends State<_VideoPage> with TickerProviderStateMixin {
       onTap: () => showComments(context, feed, post),
       child: Container(
         margin: const EdgeInsets.symmetric(horizontal: 14),
-        height: 40,
-        padding: const EdgeInsets.symmetric(horizontal: 16),
+        height: 46,
+        padding: const EdgeInsets.symmetric(horizontal: 18),
         alignment: Alignment.centerLeft,
         decoration: BoxDecoration(
           color: Colors.white24,
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(23),
         ),
-        child: Text('Say something…', style: tx(14, color: Colors.white70)),
+        child: Text('Say something', style: tx(16, color: Colors.white)),
       ),
     );
   }
