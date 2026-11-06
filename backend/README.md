@@ -123,6 +123,10 @@ You see your own posts and your friends'. Anything else answers `not_found`.
 | GET | `/api/posts?before=&limit=` | Newest first, page with `before` = oldest id you have. `[{id, author, body, mediaUrl, background, reactions, myReaction, commentCount, createdAt}]` |
 | POST | `/api/posts` | `{body?, mediaUrl?, background?}`. Needs text (max 4000) or a photo |
 | PUT | `/api/posts/{id}/reaction` | `{type}`: `like`, `love`, `haha`, `wow`, `sad`, `angry`; `null` removes mine. One per person, returns the post |
+| GET | `/api/posts/search?q=` | My posts and my friends' containing the text |
+| GET / PATCH / DELETE | `/api/posts/{id}` | One post. PATCH `{body}` and DELETE are for the author |
+| POST | `/api/posts/{id}/hide` | I no longer see it |
+| POST | `/api/posts/{id}/report` | `{reason}`: `spam`, `harassment`, `violence`, `nudity`, `other`. Also hides it from me |
 | GET | `/api/posts/{id}/comments` | Oldest first: `[{id, postId, parentId, author, body, createdAt}]` |
 | POST | `/api/posts/{id}/comments` | `{body, parentId?}`. Replies are one level deep: answering a reply joins its thread |
 
@@ -138,12 +142,12 @@ You see your own posts and your friends'. Anything else answers `not_found`.
 
 | Method | Path | |
 |---|---|---|
-| GET | `/api/games` | `sudoku`, `arcade` (Four in a row), `rumble`, `purple` |
+| GET | `/api/games` | `sudoku`, `arcade` (Four in a row), `rumble` (tap race to 60), `purple` (reaction duel, 5 rounds) |
 | POST | `/api/matches` | `{gameId, opponentId}`: challenge a friend |
 | GET | `/api/matches` | My invites and matches in progress |
 | GET | `/api/matches/{id}` | |
 | POST | `/api/matches/{id}/accept` / `decline` | |
-| POST | `/api/matches/{id}/moves` | Four in a row `{col}`; Sudoku `{cell, value}` |
+| POST | `/api/matches/{id}/moves` | Four in a row `{col}`; Sudoku `{cell, value}`; Rumble dash `{taps}`; Purple raw `{round, ms}` |
 
 With the demo data on, the demo cast plays back (`GameBot`), so a game can be
 tested with one phone: challenge Marc or anyone else in the cast and they
@@ -153,6 +157,17 @@ played. `MOCK_DATA=false` turns it off.
 The server keeps the state and checks every move (turns, full columns,
 Sudoku answers). The Sudoku solution never leaves the server. When a match
 ends, the result is posted in the players' chat (`game_result` message).
+
+### Live
+
+Friends can watch each other's lives. Video goes through LiveKit, like calls.
+
+| Method | Path | |
+|---|---|---|
+| GET | `/api/lives` | Friends' lives happening now, and mine |
+| POST | `/api/lives` | `{title?}`: go live. Returns `{live, url, token}` and tells friends (`live.started`) |
+| POST | `/api/lives/{id}/watch` | Returns `{live, url, token}`; viewers can chat but not publish |
+| POST | `/api/lives/{id}/end` | Host only (`live.ended`) |
 
 ### Calls
 
@@ -168,8 +183,17 @@ Audio and video go through **LiveKit** (WebRTC media server, in
 | POST | `/api/calls/{id}/invite` | `{userIds}`: ring more friends (1-to-1 becomes a group call) |
 
 When a call ends, the chat gets "📞 Voice call · 3:12" or "📵 Missed call".
+With the demo data on, the demo cast picks up after 3 seconds (`CallBot`), so
+ringing, answering, hanging up and the call log can be tested with one phone.
+They don't join the media room, so you won't hear anyone: testing sound needs
+two devices.
+
+To hear each other on phones or an emulator, start LiveKit with your computer's
+Wi-Fi address: `LIVEKIT_NODE_IP=192.168.1.20 docker compose up -d livekit`.
+
 LiveKit settings: `LIVEKIT_URL` (what phones connect to, e.g.
-`ws://192.168.1.20:7880`), `LIVEKIT_API_KEY`, `LIVEKIT_API_SECRET` (32+ chars).
+`ws://192.168.1.20:7880`; a `localhost` value is replaced by the API's host on
+the phone), `LIVEKIT_API_KEY`, `LIVEKIT_API_SECRET` (32+ chars).
 
 ### Push notifications
 
@@ -193,7 +217,8 @@ in the CONNECT frame, subscribe to `/user/queue/events`. Each event is
 `conversation.removed`, `friend.request`, `friend.accepted`,
 `location.updated`, `location.hidden`, `match.invited`, `match.updated`,
 `call.incoming`, `call.updated`, `call.declined`, `call.ended`, `story.new`,
-`post.new`, `post.reaction`, `post.comment`.
+`post.new`, `post.updated`, `post.deleted`, `post.reaction`, `post.comment`,
+`live.started`, `live.ended`.
 
 ## Not done yet
 

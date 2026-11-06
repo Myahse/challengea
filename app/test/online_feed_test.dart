@@ -4,6 +4,7 @@ import 'package:challengea/api/api_client.dart';
 import 'package:challengea/api/online.dart';
 import 'package:challengea/chat_store.dart';
 import 'package:challengea/feed.dart';
+import 'package:challengea/games/games.dart';
 import 'package:challengea/models.dart';
 import 'package:challengea/stories.dart';
 import 'package:flutter/material.dart';
@@ -282,6 +283,77 @@ void main() {
     expect(s.store.myStory.items, hasLength(1));
     await pumpEventQueue();
     expect(s.store.myStory.items, isEmpty);
+  });
+
+  test('a phone never calls itself: localhost becomes the server', () {
+    expect(
+      OnlineSync.reachableUrl('ws://localhost:7880', 'http://10.0.2.2:8081'),
+      'ws://10.0.2.2:7880',
+    );
+    expect(
+      OnlineSync.reachableUrl(
+        'wss://calls.example.com',
+        'http://10.0.2.2:8081',
+      ),
+      'wss://calls.example.com',
+    );
+    expect(
+      OnlineSync.reachableUrl('ws://localhost:7880', 'http://localhost:8080'),
+      'ws://localhost:7880',
+    );
+  });
+
+  test('post options reach the server and take the post away', () async {
+    final calls = <String>[];
+    final s = _online((r) async {
+      if (r.method != 'GET') calls.add('${r.method} ${r.url.path} ${r.body}');
+      return r.method == 'GET'
+          ? _json([_post(9), _post(8), _post(7)])
+          : http.Response('', 204);
+    });
+    await s.sync.refreshFeed();
+    final feed = s.store.feed;
+    final [a, b, c] = feed.home.toList();
+    feed.editPost(a, 'Changed');
+    feed.hidePost(b);
+    feed.reportPost(c, 'spam');
+    await pumpEventQueue();
+    expect(a.caption, 'Changed');
+    expect(feed.home, [a]);
+    feed.deletePost(a);
+    await pumpEventQueue();
+    expect(feed.home, isEmpty);
+    expect(calls, [
+      'PATCH /api/posts/9 {"body":"Changed"}',
+      'POST /api/posts/8/hide ',
+      'POST /api/posts/7/report {"reason":"spam"}',
+      'DELETE /api/posts/9 ',
+    ]);
+  });
+
+  test('a post deleted elsewhere leaves the feed', () async {
+    final s = _online((_) async => _json([_post(9)]));
+    await s.sync.refreshFeed();
+    s.sync.handleEvent('post.updated', {'postId': 9, 'body': 'New text'});
+    expect(s.store.feed.home.single.caption, 'New text');
+    s.sync.handleEvent('post.deleted', {'postId': 9});
+    expect(s.store.feed.home, isEmpty);
+  });
+
+  test('friends going live appear and leave', () {
+    final s = _online((_) async => _json([]));
+    s.sync.handleEvent('live.started', {
+      'id': 4,
+      'host': _user(2, 'Marc'),
+      'title': 'Hello',
+    });
+    expect(s.sync.lives.single.host.name, 'Marc');
+    s.sync.handleEvent('live.ended', {'liveId': 4});
+    expect(s.sync.lives, isEmpty);
+  });
+
+  test('every game can be played', () {
+    expect(allGames.every((g) => g.playable), isTrue);
   });
 
   test('the demo keeps its own feed and stories', () {

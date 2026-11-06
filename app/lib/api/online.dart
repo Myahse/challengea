@@ -293,6 +293,7 @@ class OnlineSync implements FeedRemote {
       refreshMatches(),
       refreshFeed(),
       refreshStories(),
+      refreshLives(),
     ]);
   }
 
@@ -534,6 +535,66 @@ class OnlineSync implements FeedRemote {
     gone.toList().forEach(_feed.removePost);
     _feed.merge(page);
   }
+
+  @override
+  void editPost(Post p) =>
+      _act(() => api.patch('/posts/${p.serverId}', {'body': p.caption}));
+
+  @override
+  void deletePost(Post p) => _act(() => api.delete('/posts/${p.serverId}'));
+
+  @override
+  void hidePost(Post p) => _act(() => api.post('/posts/${p.serverId}/hide'));
+
+  @override
+  void reportPost(Post p, String reason) =>
+      _act(() => api.post('/posts/${p.serverId}/report', {'reason': reason}));
+
+  Future<List<Post>> searchPosts(String q) async {
+    final list = await _quiet(
+      () => api.get('/posts/search?q=${Uri.encodeQueryComponent(q)}'),
+    );
+    if (list is! List) return [];
+    return [for (final d in list) _postFrom(d as Map<String, dynamic>)];
+  }
+
+  // ------------------------------------------------------------- live
+  final List<OnlineLive> lives = [];
+
+  OnlineLive _liveFrom(Map<String, dynamic> d) => OnlineLive(
+    (d['id'] as num).toInt(),
+    personFrom(d['host'] as Map<String, dynamic>),
+    d['title'] as String?,
+  );
+
+  Future<void> refreshLives() async {
+    final list = await _quiet(() => api.get('/lives'));
+    if (list is! List) return;
+    lives
+      ..clear()
+      ..addAll(list.map((d) => _liveFrom(d as Map<String, dynamic>)));
+    store.notifyChanged();
+  }
+
+  LiveJoin? _joinFrom(Object? d) {
+    if (d is! Map<String, dynamic>) return null;
+    return LiveJoin(
+      ((d['live'] as Map)['id'] as num).toInt(),
+      reachableUrl(d['url'] as String, api.baseUrl),
+      d['token'] as String,
+    );
+  }
+
+  Future<LiveJoin?> startLive(String title) async => _joinFrom(
+    await _act(
+      () => api.post('/lives', {if (title.isNotEmpty) 'title': title}),
+    ),
+  );
+
+  Future<LiveJoin?> watchLive(int id) async =>
+      _joinFrom(await _act(() => api.post('/lives/$id/watch')));
+
+  void endLive(int id) => _quiet(() => api.post('/lives/$id/end'));
 
   @override
   Future<void> loadMorePosts() async {
@@ -1072,13 +1133,23 @@ class OnlineSync implements FeedRemote {
     final call = join['call'] as Map<String, dynamic>;
     final live = LiveCall(this, (call['id'] as num).toInt(), session);
     final error = await live.connect(
-      join['url'] as String,
+      reachableUrl(join['url'] as String, api.baseUrl),
       join['token'] as String,
     );
     if (error != null) {
       onNotice?.call(error);
       session.end();
     }
+  }
+
+  /// A server set up for local development says "localhost", which on a
+  /// phone is the phone itself: the call server is where the API is.
+  static String reachableUrl(String url, String apiBase) {
+    const local = {'localhost', '127.0.0.1'};
+    final call = Uri.parse(url);
+    final server = Uri.parse(apiBase);
+    if (!local.contains(call.host) || local.contains(server.host)) return url;
+    return call.replace(host: server.host).toString();
   }
 
   void inviteToCall(int callId, Person p) => _act(
@@ -1123,6 +1194,25 @@ class OnlineSync implements FeedRemote {
         }
       case 'post.new':
         _feed.merge([_postFrom(d)]);
+      case 'post.updated':
+        final p = _feed.byServerId((d['postId'] as num).toInt());
+        if (p != null) {
+          p.caption = d['body'] as String;
+          _feed.notifyChanged();
+        }
+      case 'post.deleted':
+        final p = _feed.byServerId((d['postId'] as num).toInt());
+        if (p != null) _feed.forget(p);
+      case 'live.started':
+        final live = _liveFrom(d);
+        lives
+          ..removeWhere((l) => l.id == live.id)
+          ..add(live);
+        store.notifyChanged();
+        onNotice?.call('${live.host.firstName} is live');
+      case 'live.ended':
+        lives.removeWhere((l) => l.id == d['liveId']);
+        store.notifyChanged();
       case 'post.reaction':
         _onReaction(d);
       case 'post.comment':
@@ -1156,6 +1246,13 @@ class OnlineSync implements FeedRemote {
             groupName: node != null && node.isGroup ? node.displayName : null,
           ),
         );
+      case 'call.updated':
+        final live = store.call?.link;
+        if (live is LiveCall && live.callId == d['id']) {
+          live.syncPresence([
+            for (final id in d['inCall'] as List) (id as num).toInt(),
+          ]);
+        }
       case 'call.declined':
         final call = store.call;
         if (call != null &&
@@ -1227,6 +1324,22 @@ class OnlineSync implements FeedRemote {
       return null;
     }
   }
+}
+
+/// A friend's broadcast happening now.
+class OnlineLive {
+  OnlineLive(this.id, this.host, this.title);
+  final int id;
+  final Person host;
+  final String? title;
+}
+
+/// What a phone needs to join a live.
+class LiveJoin {
+  LiveJoin(this.id, this.url, this.token);
+  final int id;
+  final String url;
+  final String token;
 }
 
 /// Someone is calling me.

@@ -46,6 +46,7 @@ app:
     # The demo cast accepts challenges and plays back. Goes with the demo data.
     enabled: ${MOCK_DATA:true}
     delay: 1500ms
+    ring: 3s
   otp:
     ttl: 5m
     # Dev only: return the SMS code in the API response (no SMS provider yet).

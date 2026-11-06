@@ -134,7 +134,7 @@ class Post {
   final String id;
   final Creator author;
   final PostKind kind;
-  final String caption;
+  String caption;
   final List<String> mentions;
   final List<String> tags;
   final String music;
@@ -193,6 +193,10 @@ abstract interface class FeedRemote {
   void comment(Post p, Comment c, Comment? thread);
   void loadComments(Post p);
   void loadMorePosts();
+  void editPost(Post p);
+  void deletePost(Post p);
+  void hidePost(Post p);
+  void reportPost(Post p, String reason);
 }
 
 /// Profiles, videos and comments. Signed in, the home feed comes from the
@@ -261,6 +265,40 @@ class FeedData extends ChangeNotifier {
 
   void loadComments(Post p) {
     if (p.serverId != null) remote?.loadComments(p);
+  }
+
+  void editPost(Post p, String text) {
+    p.caption = text;
+    notifyListeners();
+    if (p.serverId != null) remote?.editPost(p);
+  }
+
+  void _forget(Post p) {
+    timeline.remove(p);
+    created.remove(p);
+    forYou.remove(p);
+    for (final c in creators.values) {
+      c.posts.remove(p);
+    }
+    notifyListeners();
+  }
+
+  /// Takes a post away after the server said it's gone.
+  void forget(Post p) => _forget(p);
+
+  void deletePost(Post p) {
+    _forget(p);
+    if (p.serverId != null) remote?.deletePost(p);
+  }
+
+  void hidePost(Post p) {
+    _forget(p);
+    if (p.serverId != null) remote?.hidePost(p);
+  }
+
+  void reportPost(Post p, String reason) {
+    _forget(p);
+    if (p.serverId != null) remote?.reportPost(p, reason);
   }
 
   /// The end of the feed is in sight.

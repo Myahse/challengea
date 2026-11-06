@@ -31,6 +31,10 @@ public class SocialController {
 
   public record Reaction(String type) {}
 
+  public record PostText(@Size(max = 4000) String body) {}
+
+  public record Report(String reason) {}
+
   public record NewComment(@Size(max = 2000) String body, Long parentId) {}
 
   @GetMapping("/stories")
@@ -63,6 +67,39 @@ public class SocialController {
   @ResponseStatus(HttpStatus.CREATED)
   PostDto createPost(@RequestBody @Valid NewPost body) {
     return posts.create(CurrentUser.id(), body.body(), body.mediaUrl(), body.background());
+  }
+
+  @GetMapping("/posts/search")
+  List<PostDto> search(@RequestParam String q, @RequestParam(defaultValue = "20") int limit) {
+    return posts.search(CurrentUser.id(), q, limit);
+  }
+
+  @GetMapping("/posts/{id}")
+  PostDto post(@PathVariable long id) {
+    return posts.get(CurrentUser.id(), id);
+  }
+
+  @PatchMapping("/posts/{id}")
+  PostDto editPost(@PathVariable long id, @RequestBody @Valid PostText body) {
+    return posts.edit(CurrentUser.id(), id, body.body());
+  }
+
+  @DeleteMapping("/posts/{id}")
+  @ResponseStatus(HttpStatus.NO_CONTENT)
+  void deletePost(@PathVariable long id) {
+    posts.delete(CurrentUser.id(), id);
+  }
+
+  @PostMapping("/posts/{id}/hide")
+  @ResponseStatus(HttpStatus.NO_CONTENT)
+  void hidePost(@PathVariable long id) {
+    posts.hide(CurrentUser.id(), id);
+  }
+
+  @PostMapping("/posts/{id}/report")
+  @ResponseStatus(HttpStatus.NO_CONTENT)
+  void reportPost(@PathVariable long id, @RequestBody Report body) {
+    posts.report(CurrentUser.id(), id, body.reason());
   }
 
   @PutMapping("/posts/{id}/reaction")

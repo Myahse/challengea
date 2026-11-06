@@ -27,7 +27,7 @@ import org.springframework.web.socket.client.standard.StandardWebSocketClient;
 import org.springframework.web.socket.messaging.WebSocketStompClient;
 
 /** End-to-end: HTTP + WebSocket against a real Oracle 23ai. */
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = {"mock.enabled=false", "app.bot.enabled=true", "app.bot.delay=10ms"})
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = {"mock.enabled=false", "app.bot.enabled=true", "app.bot.delay=10ms", "app.bot.ring=10ms", "app.game.start-delay=300ms"})
 @Import(TestDatabase.class)
 @SuppressWarnings("unchecked")
 class ApiIntegrationTest {
@@ -582,5 +582,104 @@ class ApiIntegrationTest {
     Thread.sleep(200);
     var match = get("/matches/" + id, me.token(), new ParameterizedTypeReference<Map<String, Object>>() {});
     assertThat(match.get("status")).isEqualTo("invited");
+  }
+
+  @Test
+  void demoFriendAnswersACallAndLeavesWithMe() throws Exception {
+    var me = signUp("Caller");
+    var bot = signUpBot("Bot");
+    befriend(me, bot);
+    var chat = post("/conversations/direct/" + bot.id(), null, me.token());
+    var events = listen(me);
+
+    var join = post("/calls", Map.of("conversationId", chat.get("id"), "video", false), me.token());
+    var id = ((Map<String, Object>) join.get("call")).get("id");
+
+    var updated = (Map<String, Object>) next(events, "call.updated").get("data");
+    assertThat((List<Number>) updated.get("inCall")).extracting(Number::longValue).contains(bot.id());
+
+    post("/calls/" + id + "/leave", null, me.token());
+    assertThat(((Number) ((Map<String, Object>) next(events, "call.ended").get("data")).get("callId")).longValue())
+        .isEqualTo(((Number) id).longValue());
+    var messages = get("/conversations/" + chat.get("id") + "/messages", me.token(), LIST);
+    assertThat(messages).extracting(m -> m.get("body")).anyMatch(b -> b.toString().contains("Voice call"));
+  }
+
+  @Test
+  void postOptionsEditDeleteHideAndReport() {
+    var author = signUp("Author");
+    var friend = signUp("Friend");
+    befriend(author, friend);
+    long id = ((Number) post("/posts", Map.of("body", "A needle in a haystack"), author.token()).get("id")).longValue();
+
+    assertThat(get("/posts/search?q=NEEDLE", friend.token(), LIST)).hasSize(1);
+    var edited = http.patch().uri("/posts/" + id).header("Authorization", "Bearer " + author.token())
+        .body(Map.of("body", "Changed")).retrieve().body(new ParameterizedTypeReference<Map<String, Object>>() {});
+    assertThat(edited.get("body")).isEqualTo("Changed");
+    assertThatThrownBy(() -> http.patch().uri("/posts/" + id).header("Authorization", "Bearer " + friend.token())
+        .body(Map.of("body", "Mine now")).retrieve().toBodilessEntity())
+        .isInstanceOf(HttpClientErrorException.Forbidden.class);
+
+    assertThatThrownBy(() -> post("/posts/" + id + "/report", Map.of("reason", "nope"), friend.token()))
+        .hasMessageContaining("invalid_reason");
+    assertThatThrownBy(() -> post("/posts/" + id + "/report", Map.of("reason", "spam"), author.token()))
+        .hasMessageContaining("own_post");
+    post("/posts/" + id + "/report", Map.of("reason", "spam"), friend.token());
+    assertThat(get("/posts", friend.token(), LIST)).extracting(p -> p.get("id")).doesNotContain((int) id);
+    assertThat(get("/posts", author.token(), LIST)).extracting(p -> p.get("id")).contains((int) id);
+
+    http.delete().uri("/posts/" + id).header("Authorization", "Bearer " + author.token()).retrieve().toBodilessEntity();
+    assertThatThrownBy(() -> get("/posts/" + id, author.token(), new ParameterizedTypeReference<Map<String, Object>>() {}))
+        .isInstanceOf(HttpClientErrorException.NotFound.class);
+  }
+
+  @Test
+  void rumbleDashIsARaceToTheGoal() throws Exception {
+    var me = signUp("Player");
+    var bot = signUpBot("Bot");
+    befriend(me, bot);
+    var id = post("/matches", Map.of("gameId", "rumble", "opponentId", bot.id()), me.token()).get("id");
+    awaitMatch(id, me.token(), m -> "active".equals(m.get("status")));
+    assertThatThrownBy(() -> post("/matches/" + id + "/moves", Map.of("taps", 500), me.token()))
+        .hasMessageContaining("invalid_move");
+    var done = awaitMatch(id, me.token(), m -> "finished".equals(m.get("status")));
+    assertThat(((Number) done.get("winnerId")).longValue()).isEqualTo(bot.id());
+  }
+
+  @Test
+  void purpleRawComparesReactionTimes() throws Exception {
+    var me = signUp("Player");
+    var bot = signUpBot("Bot");
+    befriend(me, bot);
+    var id = post("/matches", Map.of("gameId", "purple", "opponentId", bot.id()), me.token()).get("id");
+    awaitMatch(id, me.token(), m -> "active".equals(m.get("status")));
+    assertThatThrownBy(() -> post("/matches/" + id + "/moves", Map.of("round", 3, "ms", 300), me.token()))
+        .hasMessageContaining("invalid_move");
+    assertThatThrownBy(() -> post("/matches/" + id + "/moves", Map.of("round", 0, "ms", 5), me.token()))
+        .hasMessageContaining("invalid_move");
+    for (var round = 0; round < 5; round++) {
+      post("/matches/" + id + "/moves", Map.of("round", round, "ms", 100), me.token());
+    }
+    var done = awaitMatch(id, me.token(), m -> "finished".equals(m.get("status")));
+    assertThat(((Number) done.get("winnerId")).longValue()).isEqualTo(me.id());
+  }
+
+  @Test
+  void friendsCanWatchALive() {
+    var host = signUp("Host");
+    var friend = signUp("Friend");
+    var stranger = signUp("Stranger");
+    befriend(host, friend);
+    var live = (Map<String, Object>) post("/lives", Map.of("title", "Hello"), host.token()).get("live");
+    var id = live.get("id");
+    assertThat(get("/lives", friend.token(), LIST)).extracting(l -> l.get("id")).contains(id);
+    assertThat(get("/lives", stranger.token(), LIST)).isEmpty();
+    assertThat(post("/lives/" + id + "/watch", null, friend.token()).get("token")).isNotNull();
+    assertThatThrownBy(() -> post("/lives/" + id + "/watch", null, stranger.token()))
+        .isInstanceOf(HttpClientErrorException.NotFound.class);
+    assertThatThrownBy(() -> post("/lives/" + id + "/end", null, friend.token()))
+        .isInstanceOf(HttpClientErrorException.Forbidden.class);
+    post("/lives/" + id + "/end", null, host.token());
+    assertThat(get("/lives", friend.token(), LIST)).isEmpty();
   }
 }

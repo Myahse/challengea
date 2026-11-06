@@ -143,7 +143,7 @@ class _CallScreenState extends State<CallScreen> with TickerProviderStateMixin {
     showModalBottomSheet(
       context: context,
       showDragHandle: true,
-      backgroundColor: Colors.white,
+      backgroundColor: AppColors.card,
       builder: (ctx) => SafeArea(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -188,7 +188,7 @@ class _CallScreenState extends State<CallScreen> with TickerProviderStateMixin {
     showModalBottomSheet(
       context: context,
       showDragHandle: true,
-      backgroundColor: Colors.white,
+      backgroundColor: AppColors.card,
       builder: (ctx) => SafeArea(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -254,7 +254,7 @@ class _CallScreenState extends State<CallScreen> with TickerProviderStateMixin {
         }
       },
       child: Scaffold(
-        backgroundColor: Colors.white,
+        backgroundColor: AppColors.card,
         body: SafeArea(
           child: Column(
             children: [
@@ -546,7 +546,7 @@ class _CallScreenState extends State<CallScreen> with TickerProviderStateMixin {
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 color: muted ? AppColors.danger : AppColors.bubble,
-                border: Border.all(color: Colors.white, width: 2),
+                border: Border.all(color: AppColors.card, width: 2),
               ),
               child: Icon(
                 muted ? Icons.mic_off_rounded : Icons.mic_rounded,
@@ -650,7 +650,7 @@ class _CallScreenState extends State<CallScreen> with TickerProviderStateMixin {
           decoration: BoxDecoration(
             shape: BoxShape.circle,
             border: Border.all(color: AppColors.ink, width: 2),
-            color: Colors.white,
+            color: AppColors.card,
           ),
           child: const Icon(
             Icons.call_end_rounded,
@@ -713,7 +713,10 @@ class _CallScreenState extends State<CallScreen> with TickerProviderStateMixin {
             child: SizedBox(
               width: 50,
               height: 50,
-              child: Icon(icon, color: active ? Colors.white : AppColors.ink),
+              child: Icon(
+                icon,
+                color: active ? AppColors.onInk : AppColors.ink,
+              ),
             ),
           ),
         ),

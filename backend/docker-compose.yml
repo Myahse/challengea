@@ -23,7 +23,9 @@ services:
   # Phones connect to ws://<your computer>:7880; media uses UDP 7882 and TCP 7881.
   livekit:
     image: livekit/livekit-server:v1.9
-    command: --dev --bind 0.0.0.0
+    # Phones reach the call media at this address. In Docker the server can't
+    # guess it: set LIVEKIT_NODE_IP to your computer's Wi-Fi address.
+    command: --dev --bind 0.0.0.0 --node-ip ${LIVEKIT_NODE_IP:-127.0.0.1}
     environment:
       LIVEKIT_KEYS: "devkey: challengea-livekit-dev-secret-change-me"
     ports:

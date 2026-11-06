@@ -23,6 +23,7 @@ class LiveCall implements CallLink {
   EventsListener<RoomEvent>? _events;
   Timer? _noAnswer;
   bool _left = false;
+  final Set<int> _present = {};
 
   /// Returns an error message, or null once connected.
   Future<String?> connect(String url, String token) async {
@@ -76,6 +77,23 @@ class LiveCall implements CallLink {
       debugPrint('LiveKit: $e');
       return 'Couldn’t connect the call. Is the call server running?';
     }
+  }
+
+  /// The server's list of who is in the call. Someone can answer without
+  /// reaching the media room (demo friends do), and they still count.
+  void syncPresence(Iterable<int> ids) {
+    final now = ids.where((id) => id != sync.myId).toSet();
+    for (final id in now.difference(_present)) {
+      final p = sync.personById('u$id');
+      if (p != null) session.markJoined(p);
+    }
+    for (final id in _present.difference(now)) {
+      final p = sync.personById('u$id');
+      if (p != null) _onLeft(p);
+    }
+    _present
+      ..clear()
+      ..addAll(now);
   }
 
   Person _person(Participant p) =>

@@ -12,8 +12,10 @@ import '../widgets/fake_video.dart';
 import '../widgets/glass.dart';
 import '../widgets/moments.dart';
 import '../widgets/motion.dart';
+import '../widgets/post_actions.dart';
 import '../widgets/product_sheet.dart';
 import 'profile_screen.dart';
+import 'search_screen.dart';
 
 /// Full-screen videos under quiet glass controls.
 /// Swipe up for the next video, double-tap to like, tap to pause.
@@ -153,14 +155,7 @@ class _VideoFeedState extends State<VideoFeed> {
                 const Spacer(),
                 IconButton(
                   tooltip: 'Search',
-                  onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(
-                        'Search comes with the backend',
-                        style: tx(14, color: Colors.white),
-                      ),
-                    ),
-                  ),
+                  onPressed: () => SearchScreen.open(context, widget.store),
                   icon: const Icon(
                     Icons.search_rounded,
                     color: Colors.white,
@@ -494,16 +489,16 @@ class _VideoPageState extends State<_VideoPage> with TickerProviderStateMixin {
           () => showComments(context, feed, post),
           label: 'Comments',
         ),
-        action(Icons.send_rounded, compact(post.shares), () {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                'Share to a chat: coming soon',
-                style: tx(14, color: Colors.white),
-              ),
-            ),
-          );
-        }, label: 'Share'),
+        action(
+          Icons.send_rounded,
+          compact(post.shares),
+          () => showSendTo(
+            context,
+            widget.store,
+            text: '🎬 ${post.author.person.firstName}’s video: ${post.caption}',
+          ),
+          label: 'Share',
+        ),
         action(
           post.saved ? Icons.bookmark : Icons.bookmark_border_rounded,
           compact(post.saves),

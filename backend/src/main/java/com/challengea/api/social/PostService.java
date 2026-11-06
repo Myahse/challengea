@@ -28,6 +28,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class PostService {
   private static final Set<String> REACTIONS = Set.of("like", "love", "haha", "wow", "sad", "angry");
+  private static final Set<String> REPORT_REASONS = Set.of("spam", "harassment", "violence", "nudity", "other");
 
   private final PostRepository posts;
   private final ReactionRepository reactions;
@@ -37,9 +38,12 @@ public class PostService {
   private final FriendService friends;
   private final MediaService media;
   private final Events events;
+  private final HideRepository hides;
+  private final ReportRepository reports;
 
   public PostService(PostRepository posts, ReactionRepository reactions, CommentRepository comments,
-      UserRepository users, UserService userService, FriendService friends, MediaService media, Events events) {
+      UserRepository users, UserService userService, FriendService friends, MediaService media, Events events,
+      HideRepository hides, ReportRepository reports) {
     this.posts = posts;
     this.reactions = reactions;
     this.comments = comments;
@@ -48,6 +52,60 @@ public class PostService {
     this.friends = friends;
     this.media = media;
     this.events = events;
+    this.hides = hides;
+    this.reports = reports;
+  }
+
+  @Transactional(readOnly = true)
+  public PostDto get(long me, long postId) {
+    return views(me, List.of(requireVisible(me, postId))).getFirst();
+  }
+
+  @Transactional(readOnly = true)
+  public List<PostDto> search(long me, String q, int limit) {
+    var text = SocialText.clean(q);
+    if (text == null) return List.of();
+    return views(me, posts.search(me, text, PageRequest.of(0, Math.clamp(limit, 1, 50))));
+  }
+
+  /** Changes the text of my post. */
+  @Transactional
+  public PostDto edit(long me, long postId, String body) {
+    var post = requireMine(me, postId);
+    var text = SocialText.clean(body);
+    if (text == null && post.getMediaUrl() == null) {
+      throw ApiException.badRequest("empty_post", "Write something or add a photo");
+    }
+    post.setBody(text);
+    var dto = views(me, List.of(post)).getFirst();
+    events.send(audience(post), "post.updated", Map.of("postId", postId, "body", text == null ? "" : text));
+    return dto;
+  }
+
+  @Transactional
+  public void delete(long me, long postId) {
+    var post = requireMine(me, postId);
+    var everyone = audience(post);
+    posts.delete(post);
+    if (post.getMediaUrl() != null) media.delete(post.getMediaUrl());
+    events.send(everyone, "post.deleted", Map.of("postId", postId));
+  }
+
+  /** I no longer see this post. */
+  @Transactional
+  public void hide(long me, long postId) {
+    requireVisible(me, postId);
+    if (!hides.existsByPostIdAndUserId(postId, me)) hides.save(new PostHide(postId, me));
+  }
+
+  /** Reporting also hides the post from me. */
+  @Transactional
+  public void report(long me, long postId, String reason) {
+    var post = requireVisible(me, postId);
+    if (post.getAuthorId() == me) throw ApiException.badRequest("own_post", "You can't report your own post");
+    if (!REPORT_REASONS.contains(reason)) throw ApiException.badRequest("invalid_reason", "Unknown reason");
+    if (!reports.existsByPostIdAndUserId(postId, me)) reports.save(new PostReport(postId, me, reason));
+    if (!hides.existsByPostIdAndUserId(postId, me)) hides.save(new PostHide(postId, me));
   }
 
   /** Newest first; pass the oldest id you have as [before] to load older posts. */
@@ -119,6 +177,12 @@ public class PostService {
     return posts.findById(postId)
         .filter(p -> p.getAuthorId() == me || friends.areFriends(me, p.getAuthorId()))
         .orElseThrow(() -> ApiException.notFound("Post"));
+  }
+
+  private Post requireMine(long me, long postId) {
+    var post = requireVisible(me, postId);
+    if (post.getAuthorId() != me) throw ApiException.forbidden("This post is not yours");
+    return post;
   }
 
   /** Everyone who can see this post. */

@@ -13,6 +13,7 @@ import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -32,17 +33,31 @@ public class CallService {
   private final UserService users;
   private final LiveKitTokens livekit;
   private final Events events;
+  private final ApplicationEventPublisher published;
   private final Map<Long, Set<Long>> inCall = new ConcurrentHashMap<>();
   private final Map<Long, Set<Long>> invited = new ConcurrentHashMap<>();
 
   public CallService(CallRepository calls, ChatService chat, FriendService friends, UserService users,
-      LiveKitTokens livekit, Events events) {
+      LiveKitTokens livekit, Events events, ApplicationEventPublisher published) {
     this.calls = calls;
     this.chat = chat;
     this.friends = friends;
     this.users = users;
     this.livekit = livekit;
     this.events = events;
+    this.published = published;
+  }
+
+  /** Something changed in a call. */
+  public record CallChanged(long callId) {}
+
+  /** Who is ringing and who is in the call right now. */
+  public record Snapshot(boolean over, Set<Long> invited, Set<Long> present) {}
+
+  public Snapshot snapshot(long callId) {
+    var over = calls.findById(callId).map(Call::isOver).orElse(true);
+    return new Snapshot(over, Set.copyOf(invited.getOrDefault(callId, Set.of())),
+        Set.copyOf(inCall.getOrDefault(callId, Set.of())));
   }
 
   /** What a phone needs to join: the call, the LiveKit URL and its own token. */
@@ -64,6 +79,7 @@ public class CallService {
     inCall.get(call.getId()).add(me);
     var dto = view(call);
     events.send(others, "call.incoming", dto);
+    published.publishEvent(new CallChanged(call.getId()));
     return join(me, call, dto);
   }
 
@@ -76,6 +92,7 @@ public class CallService {
     inCall.computeIfAbsent(callId, k -> ConcurrentHashMap.newKeySet()).add(me);
     var dto = view(call);
     events.send(participants(call), "call.updated", dto);
+    published.publishEvent(new CallChanged(callId));
     return join(me, call, dto);
   }
 
@@ -98,6 +115,7 @@ public class CallService {
       end(call);
     } else {
       events.send(participants(call), "call.updated", view(call));
+      published.publishEvent(new CallChanged(callId));
     }
   }
 
@@ -112,6 +130,7 @@ public class CallService {
     invited.computeIfAbsent(callId, k -> ConcurrentHashMap.newKeySet()).addAll(userIds);
     var dto = view(call);
     events.send(userIds, "call.incoming", dto);
+    published.publishEvent(new CallChanged(callId));
     return dto;
   }
 

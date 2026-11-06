@@ -9,6 +9,7 @@ import '../widgets/fake_video.dart';
 import '../widgets/glass.dart';
 import '../widgets/moments.dart';
 import '../widgets/motion.dart';
+import '../widgets/post_actions.dart';
 import 'account_screen.dart';
 import 'chat_screen.dart';
 import 'video_feed.dart';
@@ -82,14 +83,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
           .toList(), // tagged (demo)
     _ => c.posts,
   };
-
-  void _snack(String text) => ScaffoldMessenger.of(context)
-    ..hideCurrentSnackBar()
-    ..showSnackBar(
-      SnackBar(
-        content: Text(text, style: tx(14, color: Colors.white)),
-      ),
-    );
 
   void _message() {
     final node = widget.store.nodeFor(c.person);
@@ -350,7 +343,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ? TextLink(
                       label: 'Share profile',
                       dark: true,
-                      onTap: () => _snack('Share profile: coming soon'),
+                      onTap: () => showSendTo(
+                        context,
+                        widget.store,
+                        title: 'Share my profile',
+                        text: profileShareText(c.person, c.handle),
+                      ),
                     )
                   : TextLink(
                       label: 'Challenge ${c.person.firstName}',

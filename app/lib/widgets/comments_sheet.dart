@@ -13,10 +13,36 @@ Future<void> showComments(BuildContext context, FeedData feed, Post post) {
   );
 }
 
-class _CommentsSheet extends StatefulWidget {
-  const _CommentsSheet({required this.feed, required this.post});
+/// The same conversation as a whole page, under a [header].
+class CommentsPage extends StatelessWidget {
+  const CommentsPage({
+    super.key,
+    required this.feed,
+    required this.post,
+    required this.header,
+    required this.top,
+  });
   final FeedData feed;
   final Post post;
+  final Widget header;
+  final double top;
+
+  @override
+  Widget build(BuildContext context) =>
+      _CommentsSheet(feed: feed, post: post, header: header, top: top);
+}
+
+class _CommentsSheet extends StatefulWidget {
+  const _CommentsSheet({
+    required this.feed,
+    required this.post,
+    this.header,
+    this.top = 0,
+  });
+  final FeedData feed;
+  final Post post;
+  final Widget? header;
+  final double top;
 
   @override
   State<_CommentsSheet> createState() => _CommentsSheetState();
@@ -56,8 +82,53 @@ class _CommentsSheetState extends State<_CommentsSheet> {
     _focus.requestFocus();
   }
 
+  Widget _pageBody() => ListenableBuilder(
+    listenable: widget.feed,
+    builder: (context, _) => Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Expanded(
+          child: ListView(
+            padding: EdgeInsets.fromLTRB(0, widget.top, 0, 12),
+            children: [
+              widget.header!,
+              Padding(
+                padding: const EdgeInsets.fromLTRB(22, 10, 22, 8),
+                child: Text(
+                  widget.post.comments.isEmpty
+                      ? 'No comments yet.'
+                      : 'Comments',
+                  style: tx(22, weight: FontWeight.w600),
+                ),
+              ),
+              for (final c in widget.post.comments) ...[
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 10),
+                  child: _comment(c),
+                ),
+                if (c.moreReplies > 0 || c.replies.isNotEmpty)
+                  _repliesToggle(c),
+                if (_expanded.contains(c))
+                  for (final r in c.replies)
+                    Padding(
+                      padding: const EdgeInsets.only(left: 72, right: 10),
+                      child: _comment(r),
+                    ),
+              ],
+            ],
+          ),
+        ),
+        ColoredBox(
+          color: AppColors.card,
+          child: SafeArea(top: false, child: _composer()),
+        ),
+      ],
+    ),
+  );
+
   @override
   Widget build(BuildContext context) {
+    if (widget.header != null) return _pageBody();
     final bottom = MediaQuery.viewInsetsOf(context).bottom;
     return Padding(
       padding: EdgeInsets.only(bottom: bottom),

@@ -9,6 +9,7 @@ import '../theme.dart';
 import '../widgets/avatar.dart';
 import '../widgets/glass.dart';
 import '../widgets/motion.dart';
+import 'live_screen.dart';
 
 /// Backgrounds for text posts and text stories.
 const backgrounds = [
@@ -63,7 +64,13 @@ Future<void> showCreateMenu(
       backgrounds[4],
       () => openPostComposer(context, store, pickPhoto: true, camera: true),
     ),
-    (Icons.sensors_rounded, 'Live', 'Coming soon', backgrounds[3], null),
+    (
+      Icons.sensors_rounded,
+      'Live',
+      'Go live to friends',
+      backgrounds[3],
+      () => LiveScreen.start(context, store),
+    ),
   ];
   return showModalBottomSheet(
     context: context,

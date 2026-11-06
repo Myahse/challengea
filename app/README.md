@@ -41,7 +41,8 @@ looks like: navigation is the floating menu (Home, Chats, +, Videos, Map).
      and you lose, 3 hints.
    - **Arcade = Four in a row**: turn by turn, falling discs, the friend
      blocks your lines.
-   - Rumble dash and Purple raw: "soon".
+   - **Rumble dash**: tap race, first to the finish line.
+   - **Purple raw**: reaction duel over 5 rounds, tap when it turns purple.
    In the demo the app plays the friend. Signed in, the demo cast accept and
    play on the server, so a real match can be tested with one phone.
 
@@ -139,4 +140,8 @@ screen ("Test server: your code is …").
 - `lib/screens/sign_in_screen.dart` — phone / email sign-in
 - `lib/theme.dart` — colors and text styles, light and dark (one place to update)
 - `lib/widgets/glass.dart` — frosted surfaces, glossy bubbles, text links
+- `lib/widgets/moments.dart` — bursts, morphing buttons, the full-screen bubble collision
+- `lib/widgets/post_actions.dart` — the ⋯ menu of a post, sending things to friends
+- `lib/screens/post_screen.dart`, `search_screen.dart`, `live_screen.dart` — one post with its comments, search, live
+- `lib/games/rumble_dash_screen.dart`, `purple_raw_screen.dart` — tap race and reaction duel
 - `lib/screens/account_screen.dart` — account and settings (gear on my profile): edit profile, friends, privacy, appearance, sign out

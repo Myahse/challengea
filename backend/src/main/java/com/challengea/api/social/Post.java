@@ -32,6 +32,10 @@ public class Post {
     this.background = background;
   }
 
+  public void setBody(String body) {
+    this.body = body;
+  }
+
   public Long getId() { return id; }
   public long getAuthorId() { return authorId; }
   public String getBody() { return body; }

@@ -6,6 +6,7 @@ import com.challengea.api.friend.FriendService;
 import com.challengea.api.realtime.Events;
 import com.challengea.api.user.UserDto;
 import com.challengea.api.user.UserService;
+import java.time.Duration;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -13,6 +14,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ThreadLocalRandom;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -20,6 +22,14 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class MatchService {
   static final int MAX_MISTAKES = 3;
+  static final int RUMBLE_GOAL = 60;
+  static final int MAX_TAPS_PER_MOVE = 20;
+  /** Phones' clocks are never quite the same. */
+  static final long CLOCK_MARGIN_MS = 1500;
+  static final int PURPLE_ROUNDS = 5;
+  /** Faster than a person can react. A false start counts as the maximum. */
+  static final int MIN_REACTION_MS = 80;
+  static final int MAX_REACTION_MS = 2000;
 
   private final GameRepository games;
   private final MatchRepository matches;
@@ -29,9 +39,11 @@ public class MatchService {
   private final ChatService chat;
   private final Events events;
   private final ApplicationEventPublisher published;
+  private final Duration startDelay;
 
   public MatchService(GameRepository games, MatchRepository matches, MoveRepository moves, FriendService friends,
-      UserService users, ChatService chat, Events events, ApplicationEventPublisher published) {
+      UserService users, ChatService chat, Events events, ApplicationEventPublisher published,
+      @Value("${app.game.start-delay:7s}") Duration startDelay) {
     this.games = games;
     this.matches = matches;
     this.moves = moves;
@@ -40,6 +52,7 @@ public class MatchService {
     this.chat = chat;
     this.events = events;
     this.published = published;
+    this.startDelay = startDelay;
   }
 
   /** Something happened in a match. */
@@ -86,6 +99,28 @@ public class MatchService {
             key(m.getChallengerId()), progress(), key(m.getOpponentId()), progress())));
         m.start(state, null); // both play at the same time
       }
+      case "rumble" -> {
+        var state = new HashMap<String, Object>();
+        state.put("goal", RUMBLE_GOAL);
+        // Both phones count down to the same moment, whenever they open the game.
+        state.put("startsAt", System.currentTimeMillis() + startDelay.toMillis());
+        state.put("players", new HashMap<>(Map.of(
+            key(m.getChallengerId()), new HashMap<>(Map.of("taps", 0)),
+            key(m.getOpponentId()), new HashMap<>(Map.of("taps", 0)))));
+        m.start(state, null);
+      }
+      case "purple" -> {
+        var rnd = ThreadLocalRandom.current();
+        var delays = new ArrayList<Integer>();
+        for (var i = 0; i < PURPLE_ROUNDS; i++) delays.add(rnd.nextInt(1500, 4500));
+        var state = new HashMap<String, Object>();
+        state.put("delays", delays);
+        state.put("rounds", PURPLE_ROUNDS);
+        state.put("players", new HashMap<>(Map.of(
+            key(m.getChallengerId()), new HashMap<>(Map.of("times", List.of())),
+            key(m.getOpponentId()), new HashMap<>(Map.of("times", List.of())))));
+        m.start(state, null);
+      }
       default -> throw ApiException.badRequest("coming_soon", "This game is coming soon");
     }
     return broadcast(m, me);
@@ -99,7 +134,10 @@ public class MatchService {
     return broadcast(m, me);
   }
 
-  /** Four in a row: {"col": 0..6}. Sudoku: {"cell": 0..80, "value": 1..9}. */
+  /**
+   * Four in a row: {"col": 0..6}. Sudoku: {"cell": 0..80, "value": 1..9}.
+   * Rumble dash: {"taps": 1..20}. Purple raw: {"round": 0..4, "ms": reaction time}.
+   */
   @Transactional
   public MatchDto move(long me, long matchId, Map<String, Object> move) {
     var m = lock(me, matchId);
@@ -107,6 +145,8 @@ public class MatchService {
     switch (m.getGameId()) {
       case "arcade" -> playFour(m, me, move);
       case "sudoku" -> playSudoku(m, me, move);
+      case "rumble" -> playRumble(m, me, move);
+      case "purple" -> playPurple(m, me, move);
       default -> throw ApiException.badRequest("coming_soon", "This game is coming soon");
     }
     moves.save(new MatchMove(m.getId(), me, move));
@@ -178,6 +218,67 @@ public class MatchService {
     } else if (intOf(mine.get("mistakes"), "mistakes") >= MAX_MISTAKES) {
       finish(m, m.other(me));
     }
+  }
+
+  // ------------------------------------------------------------- Rumble dash
+  /** First to the goal wins. Taps arrive in small batches. */
+  @SuppressWarnings("unchecked")
+  private void playRumble(Match m, long me, Map<String, Object> move) {
+    var taps = intOf(move.get("taps"), "taps");
+    if (taps < 1 || taps > MAX_TAPS_PER_MOVE) throw ApiException.badRequest("invalid_move", "Invalid taps");
+    var startsAt = ((Number) m.getState().get("startsAt")).longValue();
+    if (System.currentTimeMillis() < startsAt - CLOCK_MARGIN_MS) {
+      throw ApiException.conflict("not_started", "Wait for the countdown");
+    }
+    var state = new HashMap<>(m.getState());
+    var players = new HashMap<>((Map<String, Object>) state.get("players"));
+    var mine = new HashMap<>((Map<String, Object>) players.get(key(me)));
+    var total = Math.min(RUMBLE_GOAL, intOf(mine.get("taps"), "taps") + taps);
+    mine.put("taps", total);
+    players.put(key(me), mine);
+    state.put("players", players);
+    m.setState(state);
+    if (total >= RUMBLE_GOAL) finish(m, me);
+  }
+
+  // -------------------------------------------------------------- Purple raw
+  /** Reaction duel: lower time wins each round, most rounds wins the match. */
+  @SuppressWarnings("unchecked")
+  private void playPurple(Match m, long me, Map<String, Object> move) {
+    var round = intOf(move.get("round"), "round");
+    var ms = intOf(move.get("ms"), "ms");
+    if (ms < MIN_REACTION_MS || ms > MAX_REACTION_MS) throw ApiException.badRequest("invalid_move", "Invalid time");
+    var state = new HashMap<>(m.getState());
+    var players = new HashMap<>((Map<String, Object>) state.get("players"));
+    var mine = new HashMap<>((Map<String, Object>) players.get(key(me)));
+    var times = new ArrayList<Object>((List<Object>) mine.get("times"));
+    if (round != times.size() || round >= PURPLE_ROUNDS) throw ApiException.badRequest("invalid_move", "Wrong round");
+    times.add(ms);
+    mine.put("times", times);
+    players.put(key(me), mine);
+    state.put("players", players);
+    m.setState(state);
+    var other = (List<Object>) ((Map<String, Object>) players.get(key(m.other(me)))).get("times");
+    if (times.size() == PURPLE_ROUNDS && other.size() == PURPLE_ROUNDS) {
+      finish(m, purpleWinner(m, players));
+    }
+  }
+
+  @SuppressWarnings("unchecked")
+  private Long purpleWinner(Match m, Map<String, Object> players) {
+    var a = (List<Object>) ((Map<String, Object>) players.get(key(m.getChallengerId()))).get("times");
+    var b = (List<Object>) ((Map<String, Object>) players.get(key(m.getOpponentId()))).get("times");
+    int winsA = 0, winsB = 0, totalA = 0, totalB = 0;
+    for (var i = 0; i < PURPLE_ROUNDS; i++) {
+      int x = intOf(a.get(i), "ms"), y = intOf(b.get(i), "ms");
+      totalA += x;
+      totalB += y;
+      if (x < y) winsA++;
+      if (y < x) winsB++;
+    }
+    if (winsA != winsB) return winsA > winsB ? m.getChallengerId() : m.getOpponentId();
+    if (totalA != totalB) return totalA < totalB ? m.getChallengerId() : m.getOpponentId();
+    return null;
   }
 
   // ----------------------------------------------------------------- helpers

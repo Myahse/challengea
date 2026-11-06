@@ -41,6 +41,7 @@ interface PostRepository extends JpaRepository<Post, Long> {
   @Query("""
       select p from Post p
       where p.id < :before
+        and not exists (select 1 from PostHide h where h.postId = p.id and h.userId = :me)
         and (p.authorId = :me or exists (
           select 1 from Friendship f
           where f.status = 'accepted'
@@ -48,6 +49,27 @@ interface PostRepository extends JpaRepository<Post, Long> {
               or (f.addresseeId = :me and f.requesterId = p.authorId))))
       order by p.id desc""")
   List<Post> feed(long me, long before, Pageable page);
+
+  /** Posts I can see whose text contains q. */
+  @Query("""
+      select p from Post p
+      where lower(p.body) like lower(concat('%', :q, '%'))
+        and not exists (select 1 from PostHide h where h.postId = p.id and h.userId = :me)
+        and (p.authorId = :me or exists (
+          select 1 from Friendship f
+          where f.status = 'accepted'
+            and ((f.requesterId = :me and f.addresseeId = p.authorId)
+              or (f.addresseeId = :me and f.requesterId = p.authorId))))
+      order by p.id desc""")
+  List<Post> search(long me, String q, Pageable page);
+}
+
+interface HideRepository extends JpaRepository<PostHide, Long> {
+  boolean existsByPostIdAndUserId(long postId, long userId);
+}
+
+interface ReportRepository extends JpaRepository<PostReport, Long> {
+  boolean existsByPostIdAndUserId(long postId, long userId);
 }
 
 interface ReactionRepository extends JpaRepository<PostReaction, Long> {

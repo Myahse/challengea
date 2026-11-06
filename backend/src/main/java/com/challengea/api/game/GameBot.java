@@ -64,12 +64,22 @@ public class GameBot {
     switch (m.getStatus()) {
       case "invited" -> later(m, delay, () -> service.accept(bot, m.getId()));
       case "active" -> {
-        if (m.getGameId().equals("sudoku")) {
+        var rnd = ThreadLocalRandom.current();
+        switch (m.getGameId()) {
           // A person's pace: long enough that you can win the race.
-          var pause = delay.multipliedBy(4).plusMillis(ThreadLocalRandom.current().nextLong(delay.toMillis() * 4 + 1));
-          later(m, pause, () -> playSudoku(m.getId(), bot));
-        } else if (botTurn) {
-          later(m, delay, () -> playFour(m.getId(), bot));
+          case "sudoku" -> later(m, delay.multipliedBy(4).plusMillis(rnd.nextLong(delay.toMillis() * 4 + 1)),
+              () -> playSudoku(m.getId(), bot));
+          case "rumble" -> {
+            // Off the line with everyone else, not before.
+            var startsAt = ((Number) m.getState().get("startsAt")).longValue();
+            var wait = Math.max(delay.toMillis() / 4, startsAt - System.currentTimeMillis());
+            later(m, Duration.ofMillis(wait), () -> service.move(bot, m.getId(), Map.of("taps", rnd.nextInt(2, 4))));
+          }
+          case "purple" -> later(m, delay.multipliedBy(2).plusMillis(rnd.nextLong(delay.toMillis() * 2 + 1)),
+              () -> playPurple(m.getId(), bot));
+          default -> {
+            if (botTurn) later(m, delay, () -> playFour(m.getId(), bot));
+          }
         }
       }
       default -> { }
@@ -118,6 +128,15 @@ public class GameBot {
     if (open.isEmpty()) return;
     var cell = open.get(ThreadLocalRandom.current().nextInt(open.size()));
     service.move(bot, matchId, Map.of("cell", cell, "value", MatchService.intOf(solution.get(cell), "solution")));
+  }
+
+  /** A good person's reflexes: beatable, but not by much. */
+  @SuppressWarnings("unchecked")
+  private void playPurple(long matchId, long bot) {
+    var players = (Map<String, Object>) matches.findById(matchId).orElseThrow().getState().get("players");
+    var done = ((List<Object>) ((Map<String, Object>) players.get(Long.toString(bot))).get("times")).size();
+    if (done >= MatchService.PURPLE_ROUNDS) return;
+    service.move(bot, matchId, Map.of("round", done, "ms", ThreadLocalRandom.current().nextInt(235, 420)));
   }
 
   /** Win if it can, else block, else avoid giving a win. Not perfect on purpose, so you can beat it. */

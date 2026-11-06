@@ -31,6 +31,11 @@ public class LiveKitTokens {
 
   /** A token that lets [identity] join [room] for the next 6 hours, with mic, camera and data (reactions). */
   public String token(String room, String identity, String name) {
+    return token(room, identity, name, true);
+  }
+
+  /** Viewers of a live can't publish video or sound, only chat over data. */
+  public String token(String room, String identity, String name, boolean canPublish) {
     var now = Instant.now();
     return Jwts.builder()
         .issuer(props.apiKey())
@@ -39,7 +44,7 @@ public class LiveKitTokens {
         .claim("video", Map.of(
             "room", room,
             "roomJoin", true,
-            "canPublish", true,
+            "canPublish", canPublish,
             "canSubscribe", true,
             "canPublishData", true))
         .notBefore(Date.from(now.minusSeconds(10)))

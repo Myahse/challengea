@@ -1,22 +1,27 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../api/online.dart';
 import '../chat_store.dart';
 import '../feed.dart';
 import '../games/challenge.dart';
 import '../games/games.dart';
+import '../models.dart';
 import '../stories.dart';
 import '../theme.dart';
 import '../widgets/avatar.dart';
 import '../widgets/city_map.dart';
-import '../widgets/comments_sheet.dart';
 import '../widgets/fake_video.dart';
 import '../widgets/glass.dart';
 import '../widgets/moments.dart';
 import '../widgets/motion.dart';
+import '../widgets/post_actions.dart';
 import '../widgets/story_ring.dart';
 import 'create.dart';
+import 'live_screen.dart';
+import 'post_screen.dart';
 import 'profile_screen.dart';
+import 'search_screen.dart';
 import 'story_viewer.dart';
 import 'video_feed.dart';
 
@@ -161,7 +166,7 @@ class _TopBar extends StatelessWidget {
             _BarAction(
               icon: Icons.search_rounded,
               label: 'Search',
-              onTap: () => _soon(context, 'Search'),
+              onTap: () => SearchScreen.open(context, store),
             ),
             _BarAction(
               icon: Icons.notifications_none_rounded,
@@ -273,16 +278,6 @@ class _BarAction extends StatelessWidget {
   }
 }
 
-void _soon(BuildContext context, String what) {
-  ScaffoldMessenger.of(context)
-    ..hideCurrentSnackBar()
-    ..showSnackBar(
-      SnackBar(
-        content: Text('$what: coming soon', style: tx(14, color: Colors.white)),
-      ),
-    );
-}
-
 // ---------------------------------------------------------------- stories
 class _StoriesRow extends StatelessWidget {
   const _StoriesRow({required this.store});
@@ -324,6 +319,17 @@ class _StoriesRow extends StatelessWidget {
                     ),
                   ),
           ),
+          for (final live in store.online?.lives ?? const <OnlineLive>[])
+            if (!store.online!.isMe(live.host))
+              FadeSlideIn(
+                key: ValueKey('live-${live.id}'),
+                offset: const Offset(28, 0),
+                child: _StoryTile(
+                  label: live.host.firstName,
+                  onTap: () => LiveScreen.watch(context, store, live),
+                  child: _LiveBubble(person: live.host),
+                ),
+              ),
           for (var i = 0; i < stories.length; i++)
             FadeSlideIn(
               delay: Duration(milliseconds: 70 * i),
@@ -342,6 +348,46 @@ class _StoriesRow extends StatelessWidget {
       ),
     );
   }
+}
+
+/// A friend who is live right now: a red ring and a label.
+class _LiveBubble extends StatelessWidget {
+  const _LiveBubble({required this.person});
+  final Person person;
+
+  @override
+  Widget build(BuildContext context) => SizedBox(
+    width: 68,
+    height: 68,
+    child: Stack(
+      clipBehavior: Clip.none,
+      alignment: Alignment.bottomCenter,
+      children: [
+        Container(
+          padding: const EdgeInsets.all(3.5),
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            border: Border.all(color: AppColors.danger, width: 2),
+          ),
+          child: PersonAvatar(person, diameter: 57),
+        ),
+        Positioned(
+          bottom: -5,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 1),
+            decoration: BoxDecoration(
+              color: AppColors.danger,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Text(
+              'LIVE',
+              style: tx(10, weight: FontWeight.w600, color: Colors.white),
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
 }
 
 class _StoryTile extends StatelessWidget {
@@ -633,9 +679,21 @@ class _NearbyCard extends StatelessWidget {
 /// A post as one big tile. Short text cards go black and centered with a
 /// glossy bubble rising from the bottom; everything else sits on white.
 class PostCard extends StatelessWidget {
-  const PostCard({super.key, required this.store, required this.post});
+  const PostCard({
+    super.key,
+    required this.store,
+    required this.post,
+    this.inScreen = false,
+    this.onGone,
+  });
   final ChatStore store;
   final Post post;
+
+  /// Already on the post's own page: no need to open it again.
+  final bool inScreen;
+
+  /// The post was deleted or hidden.
+  final VoidCallback? onGone;
 
   @override
   Widget build(BuildContext context) {
@@ -647,7 +705,11 @@ class PostCard extends StatelessWidget {
         color: dark ? AppColors.hero : AppColors.card,
         borderRadius: BorderRadius.circular(30),
       ),
-      child: dark ? _hero(context) : _plain(context),
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: inScreen ? null : () => PostScreen.open(context, store, post),
+        child: dark ? _hero(context) : _plain(context),
+      ),
     );
   }
 
@@ -711,7 +773,8 @@ class PostCard extends StatelessWidget {
         ),
         IconButton(
           tooltip: 'Post options',
-          onPressed: () => _soon(context, 'Post options'),
+          onPressed: () =>
+              showPostOptions(context, store, post, onGone: onGone),
           icon: Icon(Icons.more_horiz, color: muted),
         ),
       ],
@@ -725,17 +788,23 @@ class PostCard extends StatelessWidget {
       spacing: 20,
       children: [
         ReactionButton(post: post, feed: feed, dark: dark),
-        TextLink(
-          label: 'Reply',
-          dark: dark,
-          chevron: false,
-          onTap: () => showComments(context, feed, post),
-        ),
+        if (!inScreen)
+          TextLink(
+            label: 'Reply',
+            dark: dark,
+            chevron: false,
+            onTap: () => PostScreen.open(context, store, post),
+          ),
         TextLink(
           label: 'Share',
           dark: dark,
           chevron: false,
-          onTap: () => _share(context),
+          onTap: () => showSendTo(
+            context,
+            store,
+            text:
+                '📎 ${post.author.person.firstName}’s post: ${post.caption.isEmpty ? 'a photo' : post.caption}',
+          ),
         ),
         if (!post.author.isMe)
           TextLink(
@@ -949,68 +1018,6 @@ class PostCard extends StatelessWidget {
               ],
             ),
           ),
-        ),
-      ),
-    );
-  }
-
-  void _share(BuildContext context) {
-    final friends = store.friends.take(8).toList();
-    showModalBottomSheet(
-      context: context,
-      showDragHandle: true,
-      builder: (ctx) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(22, 0, 22, 12),
-              child: Text('Send to', style: tx(28, weight: FontWeight.w600)),
-            ),
-            SizedBox(
-              height: 96,
-              child: ListView(
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                children: [
-                  for (final p in friends)
-                    Pressable(
-                      onTap: () {
-                        Navigator.pop(ctx);
-                        store.send(
-                          store.nodeFor(p),
-                          '📎 ${post.author.person.firstName}’s post: ${post.caption}',
-                        );
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(
-                              'Sent to ${p.firstName}',
-                              style: tx(14, color: Colors.white),
-                            ),
-                          ),
-                        );
-                      },
-                      child: SizedBox(
-                        width: 76,
-                        child: Column(
-                          children: [
-                            PersonAvatar(p, diameter: 56),
-                            const SizedBox(height: 6),
-                            Text(
-                              p.firstName,
-                              style: tx(12),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 16),
-          ],
         ),
       ),
     );

@@ -13,6 +13,8 @@ import '../widgets/moments.dart';
 import '../widgets/motion.dart';
 import 'four_in_row_screen.dart';
 import 'games.dart';
+import 'purple_raw_screen.dart';
+import 'rumble_dash_screen.dart';
 import 'sudoku_duel_screen.dart';
 
 /// Pick who to challenge (from a game tile).
@@ -121,6 +123,8 @@ Future<void> startChallenge(
     MaterialPageRoute(
       builder: (_) => switch (game.id) {
         'sudoku' => SudokuDuelScreen(store: store, friend: friend, seed: seed),
+        'rumble' => RumbleDashScreen(store: store, friend: friend),
+        'purple' => PurpleRawScreen(store: store, friend: friend),
         _ => FourInRowScreen(store: store, friend: friend),
       },
     ),
@@ -434,6 +438,8 @@ void openMatch(BuildContext context, ChatStore store, OnlineMatch m) {
           seed: 0,
           match: m,
         ),
+        'rumble' => RumbleDashScreen(store: store, friend: friend, match: m),
+        'purple' => PurpleRawScreen(store: store, friend: friend, match: m),
         _ => FourInRowScreen(store: store, friend: friend, match: m),
       },
     ),

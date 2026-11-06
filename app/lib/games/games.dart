@@ -36,20 +36,24 @@ const fourInRow = GameInfo(
   playable: true,
 );
 
-const allGames = [
-  sudokuDuel,
-  fourInRow,
-  GameInfo(
-    'rumble',
-    'Rumble dash',
-    'Coming soon',
-    Icons.directions_run_rounded,
-    [Color(0xFF3D7BFF), Color(0xFFFFB13D)],
-  ),
-  GameInfo('purple', 'Purple raw', 'Coming soon', Icons.favorite_rounded, [
-    Color(0xFFFFC94D),
-    Color(0xFF7A2BC2),
-  ]),
-];
+const rumbleDash = GameInfo(
+  'rumble',
+  'Rumble dash',
+  'Tap race: first to the finish line',
+  Icons.directions_run_rounded,
+  [Color(0xFF3D7BFF), Color(0xFFFFB13D)],
+  playable: true,
+);
+
+const purpleRaw = GameInfo(
+  'purple',
+  'Purple raw',
+  'Reaction duel: tap when it turns purple',
+  Icons.bolt_rounded,
+  [Color(0xFFB45CFF), Color(0xFF7A2BC2)],
+  playable: true,
+);
+
+const allGames = [sudokuDuel, fourInRow, rumbleDash, purpleRaw];
 
 GameInfo gameById(String id) => allGames.firstWhere((g) => g.id == id);
