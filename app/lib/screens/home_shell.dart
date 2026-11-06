@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -5,6 +7,7 @@ import '../chat_store.dart';
 import '../games/challenge.dart';
 import '../games/games.dart';
 import '../widgets/glass.dart';
+import '../widgets/moments.dart';
 import '../widgets/motion.dart';
 import '../theme.dart';
 import 'chat_home.dart';
@@ -62,6 +65,17 @@ class _HomeShellState extends State<HomeShell> {
       };
       online.onInvite = (m) {
         if (mounted) showInvite(context, widget.store, m);
+      };
+      online.onFriendAccepted = (person) {
+        if (mounted) {
+          showMeet(
+            context,
+            a: widget.store.me,
+            b: person,
+            title: 'You’re friends',
+            subtitle: 'You and ${person.firstName} can chat and play now',
+          );
+        }
       };
       online.onNotice = (text) {
         if (!mounted) return;
@@ -185,24 +199,34 @@ class _BottomNav extends StatelessWidget {
         height: 64,
         child: Stack(
           children: [
-            // The pill that follows the current page.
-            AnimatedAlign(
-              duration: Motion.normal,
+            // The pill follows the page and stretches like liquid on the way.
+            TweenAnimationBuilder<double>(
+              tween: Tween(begin: index.toDouble(), end: index.toDouble()),
+              duration: const Duration(milliseconds: 460),
               curve: Motion.ease,
-              alignment: Alignment(-1 + index / 2, 0),
-              child: FractionallySizedBox(
-                widthFactor: 1 / _items.length,
-                child: Center(
-                  child: Container(
-                    width: 52,
-                    height: 52,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: active.withValues(alpha: .13),
+              builder: (context, v, _) {
+                final stretch = sin((v - v.floor()) * pi);
+                return Align(
+                  alignment: Alignment(-1 + v / 2, 0),
+                  child: FractionallySizedBox(
+                    widthFactor: 1 / _items.length,
+                    child: OverflowBox(
+                      minWidth: 0,
+                      maxWidth: 200,
+                      child: Center(
+                        child: Container(
+                          width: 52 + 44 * stretch,
+                          height: 52 - 10 * stretch,
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(26),
+                            color: active.withValues(alpha: .13),
+                          ),
+                        ),
+                      ),
                     ),
                   ),
-                ),
-              ),
+                );
+              },
             ),
             Row(
               children: [
@@ -251,13 +275,18 @@ class _BottomNav extends StatelessWidget {
             isLabelVisible: i == 1 && unread > 0,
             label: Text('$unread'),
             backgroundColor: AppColors.accent,
-            child: AnimatedSwitcher(
-              duration: Motion.fast,
-              child: Icon(
-                i == index ? _items[i].$2 : _items[i].$1,
-                key: ValueKey(i == index),
-                color: color,
-                size: 25,
+            child: AnimatedScale(
+              scale: i == index ? 1.14 : 1,
+              duration: Motion.normal,
+              curve: const Cubic(.2, 1.9, .4, 1),
+              child: AnimatedSwitcher(
+                duration: Motion.fast,
+                child: Icon(
+                  i == index ? _items[i].$2 : _items[i].$1,
+                  key: ValueKey(i == index),
+                  color: color,
+                  size: 25,
+                ),
               ),
             ),
           ),

@@ -31,11 +31,22 @@ class Pressable extends StatefulWidget {
   State<Pressable> createState() => _PressableState();
 }
 
-class _PressableState extends State<Pressable> {
+class _PressableState extends State<Pressable>
+    with SingleTickerProviderStateMixin {
+  late final _ring = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 560),
+  );
   bool _down = false;
 
   void _set(bool v) {
     if (_down != v) setState(() => _down = v);
+  }
+
+  @override
+  void dispose() {
+    _ring.dispose();
+    super.dispose();
   }
 
   @override
@@ -49,6 +60,9 @@ class _PressableState extends State<Pressable> {
           ? null
           : () {
               if (widget.haptic) HapticFeedback.selectionClick();
+              if (!MediaQuery.disableAnimationsOf(context)) {
+                _ring.forward(from: 0);
+              }
               widget.onTap!();
             },
       onLongPress: widget.onLongPress,
@@ -56,12 +70,46 @@ class _PressableState extends State<Pressable> {
         scale: _down ? widget.scale : 1,
         duration: _down
             ? const Duration(milliseconds: 110)
-            : const Duration(milliseconds: 420),
-        curve: _down ? Curves.easeOut : Motion.ease,
-        child: widget.child,
+            : const Duration(milliseconds: 460),
+        curve: _down ? Curves.easeOut : const Cubic(.2, 1.9, .4, 1),
+        child: CustomPaint(
+          foregroundPainter: _PressRing(
+            _ring,
+            Theme.of(context).colorScheme.primary,
+          ),
+          child: widget.child,
+        ),
       ),
     );
   }
+}
+
+/// A soft sonar ring around whatever was pressed.
+class _PressRing extends CustomPainter {
+  _PressRing(this.t, this.color) : super(repaint: t);
+  final Animation<double> t;
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final v = t.value;
+    if (v <= 0 || v >= 1 || size.shortestSide > 150) return;
+    final eased = Curves.easeOutCubic.transform(v);
+    final grow = 2 + 13 * eased;
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        (Offset.zero & size).inflate(grow),
+        Radius.circular(size.shortestSide / 2 + grow),
+      ),
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2.2 * (1 - eased) + .4
+        ..color = color.withValues(alpha: .55 * (1 - eased)),
+    );
+  }
+
+  @override
+  bool shouldRepaint(_PressRing old) => old.color != color;
 }
 
 /// Fades and slides its child in once, after [delay] (use index * 60 ms to stagger lists).

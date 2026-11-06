@@ -6,6 +6,7 @@ import '../stories.dart';
 import '../theme.dart';
 import '../widgets/avatar.dart';
 import '../widgets/glass.dart';
+import '../widgets/moments.dart';
 import '../widgets/motion.dart';
 
 /// Full-screen stories, Snapchat / WhatsApp style.
@@ -346,19 +347,7 @@ class _StoryPageState extends State<_StoryPage>
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           for (final e in const ['😂', '😍', '🔥', '👏', '😮'])
-                            Pressable(
-                              scale: .7,
-                              onTap: () => _send(e),
-                              child: Padding(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 10,
-                                ),
-                                child: Text(
-                                  e,
-                                  style: const TextStyle(fontSize: 30),
-                                ),
-                              ),
-                            ),
+                            EmojiShot(emoji: e, onTap: () => _send(e)),
                         ],
                       ),
                       const SizedBox(height: 10),

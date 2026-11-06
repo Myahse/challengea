@@ -7,6 +7,7 @@ import '../theme.dart';
 import '../widgets/avatar.dart';
 import '../widgets/fake_video.dart';
 import '../widgets/glass.dart';
+import '../widgets/moments.dart';
 import '../widgets/motion.dart';
 import 'account_screen.dart';
 import 'chat_screen.dart';
@@ -44,6 +45,7 @@ class ProfileScreen extends StatefulWidget {
 class _ProfileScreenState extends State<ProfileScreen> {
   final _scroll = ScrollController();
   final _gridKey = GlobalKey();
+  final _followKey = GlobalKey();
   int _tab = 0;
 
   @override
@@ -285,8 +287,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
         Pressable(
-          onTap: () => feed.toggleFollow(c),
+          onTap: () {
+            final pill = _followKey.currentContext;
+            if (!c.followed && pill != null) Burst.on(pill);
+            feed.toggleFollow(c);
+          },
           child: AnimatedContainer(
+            key: _followKey,
             duration: Motion.fast,
             height: 44,
             padding: const EdgeInsets.symmetric(horizontal: 22),

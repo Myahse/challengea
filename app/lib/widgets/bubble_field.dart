@@ -9,6 +9,7 @@ import '../chat_store.dart';
 import '../models.dart';
 import '../theme.dart';
 import 'avatar.dart';
+import 'moments.dart';
 
 /// The free-floating friends area of the chat home.
 ///
@@ -205,6 +206,16 @@ class _BubbleFieldState extends State<BubbleField>
       HapticFeedback.mediumImpact();
       final result = widget.store.merge(n, target);
       final group = result.group;
+      final box = context.findRenderObject();
+      if (box is RenderBox && target.pos != null) {
+        Burst.at(
+          context,
+          box.localToGlobal(target.pos!),
+          colors: [for (final p in group.members) p.color],
+          count: 26,
+          spread: 150,
+        );
+      }
       if (result.created) {
         // New group pops out of the merge point; the dragged friend floats home.
         group.pos = target.pos;

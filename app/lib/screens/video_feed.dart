@@ -10,6 +10,7 @@ import '../widgets/avatar.dart';
 import '../widgets/comments_sheet.dart';
 import '../widgets/fake_video.dart';
 import '../widgets/glass.dart';
+import '../widgets/moments.dart';
 import '../widgets/motion.dart';
 import '../widgets/product_sheet.dart';
 import 'profile_screen.dart';
@@ -300,6 +301,13 @@ class _VideoPageState extends State<_VideoPage> with TickerProviderStateMixin {
   void _doubleTap(TapDownDetails d) {
     HapticFeedback.lightImpact();
     feed.like(post);
+    Burst.at(
+      context,
+      d.globalPosition,
+      count: 16,
+      spread: 120,
+      colors: const [AppColors.danger, Color(0xFFFF9DB5)],
+    );
     setState(() => _heartAt = d.localPosition);
     _heart.forward(from: 0);
   }

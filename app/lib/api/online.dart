@@ -91,6 +91,9 @@ class OnlineSync implements FeedRemote {
   void Function(IncomingCall call)? onIncomingCall;
   void Function(String text)? onNotice;
 
+  /// Set by the UI: someone accepted my friend request.
+  void Function(Person person)? onFriendAccepted;
+
   /// The conversation currently open on screen (its messages count as read).
   BubbleNode? openNode;
 
@@ -782,7 +785,7 @@ class OnlineSync implements FeedRemote {
       if (n.messages.any((x) => x.serverId == m.serverId)) {
         n.messages.remove(local);
       } else if (i >= 0) {
-        n.messages[i] = m;
+        n.messages[i] = m..slot = local.slot;
       }
       store.notifyChanged();
     } on ApiError catch (e) {
@@ -972,9 +975,11 @@ class OnlineSync implements FeedRemote {
     return res is Map ? res['friendship'] as String? : null;
   }
 
-  Future<void> acceptFriend(Person p) async {
-    await _act(() => api.post('/friends/${idOf(p)}/accept'));
+  /// True when it worked.
+  Future<bool> acceptFriend(Person p) async {
+    final res = await _act(() => api.post('/friends/${idOf(p)}/accept'));
     await refreshFriends();
+    return res != null;
   }
 
   // Games
@@ -1110,9 +1115,12 @@ class OnlineSync implements FeedRemote {
         refreshConversations();
         refreshFeed();
         refreshStories();
-        onNotice?.call(
-          '${(d['by'] as Map)['displayName']} accepted your request',
-        );
+        final by = personFrom(d['by'] as Map<String, dynamic>);
+        if (onFriendAccepted != null) {
+          onFriendAccepted!(by);
+        } else {
+          onNotice?.call('${by.firstName} accepted your request');
+        }
       case 'post.new':
         _feed.merge([_postFrom(d)]);
       case 'post.reaction':

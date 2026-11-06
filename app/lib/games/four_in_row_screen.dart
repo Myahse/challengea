@@ -8,6 +8,7 @@ import '../chat_store.dart';
 import '../models.dart';
 import '../theme.dart';
 import '../widgets/avatar.dart';
+import '../widgets/moments.dart';
 import 'challenge.dart';
 import 'four_logic.dart';
 import 'games.dart';
@@ -93,7 +94,9 @@ class _FourInRowScreenState extends State<FourInRowScreen> {
       _moves = (m.state['moves'] as num?)?.toInt() ?? 0;
       _myTurn = m.currentTurnId == online.myId;
       if (m.finished) {
+        final wasOpen = _winner == null;
         _winner = m.winnerId == null ? 0 : (m.winnerId == online.myId ? 1 : 2);
+        if (wasOpen && _winner == 1) _celebrate();
         final line = m.state['winLine'] as List?;
         _winLine = line == null
             ? null
@@ -143,12 +146,17 @@ class _FourInRowScreenState extends State<FourInRowScreen> {
     });
   }
 
+  void _celebrate() => WidgetsBinding.instance.addPostFrameCallback((_) {
+    if (mounted) Burst.victory(context);
+  });
+
   bool _checkEnd(int player) {
     final line = _board.winLine(player);
     if (line == null && !_board.full) return false;
     setState(() {
       _winLine = line;
       _winner = line == null ? 0 : player;
+      if (_winner == 1) _celebrate();
     });
     final f = widget.friend.firstName;
     final text = switch (_winner) {

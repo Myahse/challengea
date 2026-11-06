@@ -12,6 +12,7 @@ import '../widgets/city_map.dart';
 import '../widgets/comments_sheet.dart';
 import '../widgets/fake_video.dart';
 import '../widgets/glass.dart';
+import '../widgets/moments.dart';
 import '../widgets/motion.dart';
 import '../widgets/story_ring.dart';
 import 'create.dart';
@@ -753,7 +754,8 @@ class PostCard extends StatelessWidget {
     final size = n <= 44 ? 38.0 : (n <= 90 ? 30.0 : 24.0);
     final ball = post.shownColors.first;
     return GestureDetector(
-      onDoubleTap: () => _doubleTap(),
+      onDoubleTapDown: (d) => _doubleTap(context, d.globalPosition),
+      onDoubleTap: () {},
       child: Stack(
         alignment: Alignment.bottomCenter,
         children: [
@@ -792,8 +794,16 @@ class PostCard extends StatelessWidget {
     );
   }
 
-  void _doubleTap() {
+  void _doubleTap(BuildContext context, Offset at) {
     HapticFeedback.lightImpact();
+    Burst.at(
+      context,
+      at,
+      emoji: '❤️',
+      count: 16,
+      spread: 110,
+      colors: const [AppColors.danger, Color(0xFFFF9DB5)],
+    );
     if (post.reaction == null) store.feed.react(post, '❤️');
   }
 
@@ -848,7 +858,8 @@ class PostCard extends StatelessWidget {
   Widget? _media(BuildContext context) {
     if (post.image != null) {
       return GestureDetector(
-        onDoubleTap: _doubleTap,
+        onDoubleTapDown: (d) => _doubleTap(context, d.globalPosition),
+        onDoubleTap: () {},
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 8),
           child: ClipRRect(
@@ -869,7 +880,8 @@ class PostCard extends StatelessWidget {
     final video = post.kind == PostKind.video;
     return GestureDetector(
       onTap: video ? () => VideoFeed.open(context, store, [post], 0) : null,
-      onDoubleTap: _doubleTap,
+      onDoubleTapDown: (d) => _doubleTap(context, d.globalPosition),
+      onDoubleTap: () {},
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 8),
         child: ClipRRect(
@@ -1080,6 +1092,7 @@ class _ReactionButtonState extends State<ReactionButton> {
                               scale: 1.25,
                               onTap: () {
                                 widget.feed.react(widget.post, _reactions[i]);
+                                Burst.on(context, emoji: _reactions[i]);
                                 _close();
                               },
                               child: Padding(
@@ -1128,7 +1141,11 @@ class _ReactionButtonState extends State<ReactionButton> {
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
         onLongPress: _open,
-        onTap: () => widget.feed.react(widget.post, r ?? '👍'),
+        onTap: () {
+          HapticFeedback.lightImpact();
+          if (r == null) Burst.on(context, emoji: '👍');
+          widget.feed.react(widget.post, r ?? '👍');
+        },
         child: ConstrainedBox(
           constraints: const BoxConstraints(minHeight: 44),
           child: Row(

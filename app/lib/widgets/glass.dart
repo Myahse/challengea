@@ -4,6 +4,7 @@ import 'dart:ui' show ImageFilter;
 import 'package:flutter/material.dart';
 
 import '../theme.dart';
+import 'motion.dart';
 
 /// Frosted surface for things that float over content: the menu, top bars,
 /// controls on photos and videos.
@@ -208,10 +209,8 @@ class TextLink extends StatelessWidget {
       button: true,
       label: label,
       excludeSemantics: true,
-      child: InkResponse(
+      child: Pressable(
         onTap: onTap,
-        highlightShape: BoxShape.rectangle,
-        radius: 0,
         child: ConstrainedBox(
           constraints: const BoxConstraints(minHeight: 44),
           child: Center(

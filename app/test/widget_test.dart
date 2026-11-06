@@ -63,7 +63,10 @@ void main() {
     tester,
   ) async {
     SharedPreferences.setMockInitialValues({});
-    addTearDown(() => FollowDeviceTheme.choice.value = ThemeChoice.system);
+    addTearDown(() {
+      FollowDeviceTheme.choice.value = ThemeChoice.system;
+      SharedPreferences.setMockInitialValues({});
+    });
     tester.view.physicalSize = const Size(430, 932);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);

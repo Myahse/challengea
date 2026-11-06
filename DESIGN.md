@@ -39,3 +39,11 @@ Inter Tight, variable, bundled in `app/assets/fonts` (SIL OFL, licence beside th
 ## Motion
 
 `Motion.ease` (`Cubic(.16, 1, .3, 1)`): things arrive fast and settle slowly, with no bounce. Reuse `Pressable`, `FadeSlideIn` and `Floaty`. Respect the system's reduced-motion setting: `FadeSlideIn` and `Floaty` already do.
+
+Key moments get more than a fade (`app/lib/widgets/moments.dart`), and they stay rare so they keep meaning something:
+
+- **`Burst`:** small bubbles and a shock ring for "that worked": likes, sending, merges. `Burst.victory` is for winning.
+- **`MorphButton`:** the label shrinks into a spinner, a check draws itself, then the button settles on its new state. Failure shakes it.
+- **`showMeet`:** two bubbles collide and fuse across the whole screen, for new friends and "Game on".
+- **`MessageArrival`:** a new message grows out of the list and pushes the others up.
+- **`Pressable`:** every press gets a sonar ring and a springy release.

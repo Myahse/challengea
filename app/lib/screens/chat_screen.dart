@@ -7,6 +7,7 @@ import '../models.dart';
 import '../theme.dart';
 import '../widgets/avatar.dart';
 import '../widgets/message_media.dart';
+import '../widgets/moments.dart';
 import '../widgets/motion.dart';
 import '../widgets/voice_recorder.dart';
 import '../games/challenge.dart';
@@ -28,6 +29,7 @@ class _ChatScreenState extends State<ChatScreen> {
   final _recorder = VoiceRecorder();
   bool _stickers = false;
   bool _cancelling = false;
+  final _sendKey = GlobalKey();
 
   BubbleNode get node => widget.node;
 
@@ -51,6 +53,9 @@ class _ChatScreenState extends State<ChatScreen> {
   void _send() {
     final text = _input.text.trim();
     if (text.isEmpty) return;
+    final button = _sendKey.currentContext;
+    if (button != null) Burst.on(button, count: 9, spread: 46);
+    HapticFeedback.lightImpact();
     widget.store.send(node, text);
     _input.clear();
   }
@@ -285,18 +290,15 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
-  /// New messages land with a little bounce; older ones appear instantly.
+  /// New messages land with [MessageArrival]; older ones appear instantly.
   Widget _bubble(Message m) {
-    final fresh = DateTime.now().difference(m.time).inSeconds < 4;
-    final child = _bubbleContent(m);
-    if (!fresh) return child;
-    return FadeSlideIn(
-      key: ObjectKey(m),
-      duration: const Duration(milliseconds: 420),
-      offset: Offset(m.isMine ? 40 : -40, 12),
-      scale: .85,
-      child: child,
+    final fresh = DateTime.now().difference(m.time).inSeconds.abs() < 4;
+    final child = KeyedSubtree(
+      key: ObjectKey(m.slot),
+      child: _bubbleContent(m),
     );
+    if (!fresh) return child;
+    return MessageArrival(key: ObjectKey(m.slot), mine: m.isMine, child: child);
   }
 
   Widget _bubbleContent(Message m) {
@@ -475,6 +477,7 @@ class _ChatScreenState extends State<ChatScreen> {
                           key: const ValueKey('send'),
                           onTap: _send,
                           child: Container(
+                            key: _sendKey,
                             width: 42,
                             height: 42,
                             margin: const EdgeInsets.only(right: 2),

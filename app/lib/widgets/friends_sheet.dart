@@ -6,6 +6,7 @@ import '../api/online.dart';
 import '../models.dart';
 import '../theme.dart';
 import 'avatar.dart';
+import 'moments.dart';
 
 /// Find people by @handle or name, send requests, accept incoming ones.
 Future<void> showFriendsSheet(BuildContext context, OnlineSync online) {
@@ -123,15 +124,23 @@ class _FriendsSheetState extends State<_FriendsSheet> {
                           'Wants to be your friend',
                           style: tx(12, color: AppColors.muted),
                         ),
-                        trailing: FilledButton(
-                          style: FilledButton.styleFrom(
-                            backgroundColor: AppColors.accent,
-                          ),
+                        trailing: MorphButton(
+                          label: 'Accept',
+                          doneLabel: 'Friends',
                           onPressed: () async {
-                            await online.acceptFriend(p);
-                            if (mounted) setState(() {});
+                            final ok = await online.acceptFriend(p);
+                            if (ok && context.mounted) {
+                              showMeet(
+                                context,
+                                a: online.store.me,
+                                b: p,
+                                title: 'You’re friends',
+                                subtitle:
+                                    'You and ${p.firstName} can chat and play now',
+                              );
+                            }
+                            return ok;
                           },
-                          child: const Text('Accept'),
                         ),
                       ),
                   ],
@@ -152,26 +161,24 @@ class _FriendsSheetState extends State<_FriendsSheet> {
                               'Friends',
                               style: tx(13, color: AppColors.muted),
                             )
-                          : _sent.containsKey(r.person.id)
-                          ? Text(
-                              _sent[r.person.id] == 'friends'
+                          : MorphButton(
+                              key: ValueKey(r.person.id),
+                              label: 'Add',
+                              doneLabel: _sent[r.person.id] == 'friends'
                                   ? 'Friends'
                                   : 'Requested',
-                              style: tx(13, color: AppColors.muted),
-                            )
-                          : OutlinedButton(
+                              startDone: _sent.containsKey(r.person.id),
+                              width: 76,
                               onPressed: () async {
                                 final status = await online.requestFriend(
                                   r.person,
                                 );
+                                if (status == null) return false;
                                 if (mounted) {
-                                  setState(
-                                    () => _sent[r.person.id] =
-                                        status ?? 'requested',
-                                  );
+                                  setState(() => _sent[r.person.id] = status);
                                 }
+                                return true;
                               },
-                              child: const Text('Add'),
                             ),
                     ),
                   if (_results.isEmpty && online.incoming.isEmpty) ...[

@@ -9,6 +9,7 @@ import '../models.dart';
 import '../theme.dart';
 import '../widgets/avatar.dart';
 import '../widgets/glass.dart';
+import '../widgets/moments.dart';
 import '../widgets/motion.dart';
 import 'four_in_row_screen.dart';
 import 'games.dart';
@@ -113,6 +114,8 @@ Future<void> startChallenge(
     builder: (ctx) => _WaitingDialog(friend: friend, game: game),
   );
   if (accepted != true || !context.mounted) return;
+  await _gameOn(context, store, friend, game);
+  if (!context.mounted) return;
   final seed = Random().nextInt(1 << 30);
   Navigator.of(context).push(
     MaterialPageRoute(
@@ -123,6 +126,20 @@ Future<void> startChallenge(
     ),
   );
 }
+
+/// You and your opponent collide before the game opens.
+Future<void> _gameOn(
+  BuildContext context,
+  ChatStore store,
+  Person friend,
+  GameInfo game,
+) => showMeet(
+  context,
+  a: store.me,
+  b: friend,
+  title: 'Game on',
+  subtitle: game.name,
+);
 
 /// Posts the result in the chat with [friend]; the friend answers.
 void postResult(
@@ -390,7 +407,8 @@ Future<void> _startOnline(
   );
   if (!context.mounted) return;
   if (accepted == true) {
-    openMatch(context, store, match);
+    await _gameOn(context, store, friend, game);
+    if (context.mounted) openMatch(context, store, match);
   } else if (match.status == 'declined') {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -451,7 +469,10 @@ Future<void> showInvite(
   );
   if (accept == true) {
     await online.accept(m);
-    if (context.mounted && m.status == 'active') openMatch(context, store, m);
+    if (context.mounted && m.status == 'active') {
+      await _gameOn(context, store, from, m.game);
+      if (context.mounted) openMatch(context, store, m);
+    }
   } else if (accept == false) {
     await online.decline(m);
   }

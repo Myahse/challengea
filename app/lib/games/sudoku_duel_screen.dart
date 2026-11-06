@@ -9,6 +9,7 @@ import '../chat_store.dart';
 import '../models.dart';
 import '../theme.dart';
 import '../widgets/avatar.dart';
+import '../widgets/moments.dart';
 import 'challenge.dart';
 import 'games.dart';
 import 'sudoku_logic.dart';
@@ -219,6 +220,7 @@ class _SudokuDuelScreenState extends State<SudokuDuelScreen> {
     if (_over) return;
     _over = true;
     _friendTimer?.cancel();
+    if (won) Burst.victory(context);
     final f = widget.friend.firstName;
     // Online, the server posts the result in your chat.
     if (_m == null) {

@@ -20,6 +20,9 @@ class Person {
 enum MessageKind { text, image, voice, sticker }
 
 class Message {
+  /// Stays the same when the server's copy replaces the one being sent.
+  Object slot = Object();
+
   Message(
     this.text, {
     this.sender,
@@ -65,7 +68,7 @@ class Message {
     localBytes: localBytes,
     duration: server.duration ?? duration,
     waveform: server.waveform ?? waveform,
-  );
+  )..slot = slot;
 
   /// A challenge invite (not a result): the card shows no Rematch button.
   final bool isChallenge;
