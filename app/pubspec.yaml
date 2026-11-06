@@ -17,6 +17,7 @@ dependencies:
   image_picker: ^1.2.4
   just_audio: ^0.10.6
   latlong2: ^0.10.1
+  livekit_client: ^2.13.2
   path_provider: ^2.1.6
   record: ^7.1.2
   shared_preferences: ^2.5.6

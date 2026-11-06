@@ -1,4 +1,4 @@
-# Local development: Oracle Database 23ai Free + the Challengea API.
+# Local development: Oracle Database 23ai Free + LiveKit (calls) + the Challengea API.
 #   docker compose up -d          (first start of Oracle takes ~30 s)
 #   API:    http://localhost:8080   (health: /actuator/health)
 #   Oracle: localhost:1521/FREEPDB1  user challengea / challengea_dev
@@ -19,6 +19,18 @@ services:
       timeout: 5s
       retries: 20
 
+  # Media server for voice / video calls (WebRTC).
+  # Phones connect to ws://<your computer>:7880; media uses UDP 7882 and TCP 7881.
+  livekit:
+    image: livekit/livekit-server:v1.9
+    command: --dev --bind 0.0.0.0
+    environment:
+      LIVEKIT_KEYS: "devkey: challengea-livekit-dev-secret-change-me"
+    ports:
+      - "7880:7880"
+      - "7881:7881"
+      - "7882:7882/udp"
+
   api:
     build: .
     depends_on:
@@ -30,6 +42,9 @@ services:
       DB_PASSWORD: challengea_dev
       JWT_SECRET: change-me-in-production-at-least-32-characters
       OTP_DEV_ECHO: "true"   # returns the SMS code in the response until an SMS provider is plugged in
+      LIVEKIT_URL: ws://localhost:7880   # use your computer's Wi-Fi address for real phones
+      LIVEKIT_API_KEY: devkey
+      LIVEKIT_API_SECRET: challengea-livekit-dev-secret-change-me
     ports:
       - "8080:8080"
 

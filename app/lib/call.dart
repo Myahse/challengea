@@ -35,10 +35,55 @@ class CallSession extends ChangeNotifier {
     required this.me,
     this.groupName,
     this.video = false,
+    this.simulate = true,
   }) : startedAsGroup = people.length > 1,
        participants = [for (final p in people) CallParticipant(p)] {
-    _scheduleAnswers();
+    if (simulate) _scheduleAnswers();
     _ticker = Timer.periodic(const Duration(seconds: 1), (_) => _tick());
+  }
+
+  /// Demo: people answer by themselves. Live: a [CallLink] (LiveKit) drives it.
+  final bool simulate;
+  CallLink? link;
+
+  // ---- updates from the live call ----
+  void markJoined(Person p) {
+    final c = participants.where((x) => x.person.id == p.id).firstOrNull;
+    if (c == null) {
+      participants.add(CallParticipant(p, state: CallState.joined));
+    } else {
+      c.state = CallState.joined;
+    }
+    connectedAt ??= DateTime.now();
+    notifyListeners();
+  }
+
+  /// Someone hung up. In a 1-to-1 call they stay listed (the call ends right after).
+  void markLeft(Person p) {
+    if (isGroup && participants.length > 1) {
+      participants.removeWhere((x) => x.person.id == p.id);
+    }
+    notifyListeners();
+  }
+
+  void setSpeaking(Person? p) {
+    speaking = p;
+    notifyListeners();
+  }
+
+  void setMuted(Person p, bool muted) {
+    for (final c in participants) {
+      if (c.person.id == p.id) c.muted = muted;
+    }
+    notifyListeners();
+  }
+
+  /// For [CallLink]s (notifyListeners is protected).
+  void notifyChanged() => notifyListeners();
+
+  void receiveReaction(String emoji, Person from) {
+    reactions.add(Reaction(emoji, from));
+    notifyListeners();
   }
 
   final Person me;
@@ -67,7 +112,7 @@ class CallSession extends ChangeNotifier {
 
   String get title {
     if (isGroup) return groupName ?? 'Group call';
-    return participants.first.person.name;
+    return participants.firstOrNull?.person.name ?? 'Call';
   }
 
   Duration get elapsed =>
@@ -103,6 +148,10 @@ class CallSession extends ChangeNotifier {
 
   void _tick() {
     if (ended) return;
+    if (!simulate) {
+      notifyListeners(); // the timer
+      return;
+    }
     // Pretend someone is talking.
     final talkers = <Person>[
       if (micOn) me,
@@ -132,11 +181,16 @@ class CallSession extends ChangeNotifier {
       return;
     }
     participants.add(CallParticipant(p));
-    _scheduleAnswers();
+    if (simulate) {
+      _scheduleAnswers();
+    } else {
+      link?.invite(p);
+    }
     notifyListeners();
   }
 
   void react(String emoji) {
+    link?.sendReaction(emoji);
     reactions.add(Reaction(emoji, null));
     notifyListeners();
   }
@@ -145,16 +199,19 @@ class CallSession extends ChangeNotifier {
 
   void toggleMic() {
     micOn = !micOn;
+    link?.setMic(micOn);
     notifyListeners();
   }
 
   void toggleVideo() {
     video = !video;
+    link?.setCamera(video);
     notifyListeners();
   }
 
   void toggleSpeaker() {
     speakerOn = !speakerOn;
+    link?.setSpeaker(speakerOn);
     notifyListeners();
   }
 
@@ -166,6 +223,7 @@ class CallSession extends ChangeNotifier {
   void end() {
     if (ended) return;
     ended = true;
+    link?.hangUp();
     _ticker.cancel();
     for (final t in _timers) {
       t.cancel();
@@ -178,4 +236,17 @@ class CallSession extends ChangeNotifier {
     end();
     super.dispose();
   }
+}
+
+/// What a live call (LiveKit) does for [CallSession]. Implemented in api/live_call.dart.
+abstract class CallLink {
+  void setMic(bool on);
+  void setCamera(bool on);
+  void setSpeaker(bool on);
+  void sendReaction(String emoji);
+  void invite(Person p);
+  void hangUp();
+
+  /// Live video of a person (or me), if their camera is on.
+  Object? videoTrackOf(Person p);
 }

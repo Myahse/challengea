@@ -2,6 +2,8 @@ import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:livekit_client/livekit_client.dart'
+    show VideoTrack, VideoTrackRenderer, VideoViewFit, VideoViewMirrorMode;
 
 import '../call.dart';
 import '../chat_store.dart';
@@ -75,9 +77,29 @@ class _CallScreenState extends State<CallScreen> with TickerProviderStateMixin {
     super.dispose();
   }
 
+  bool _closing = false;
+
   void _onCall() {
     if (!mounted) return;
-    if (call.ended) return;
+    if (call.ended) {
+      // Ended elsewhere (they hung up, no answer...): close this screen.
+      if (_closing) return;
+      _closing = true;
+      final label = call.connected
+          ? 'Call ended · ${call.elapsedLabel}'
+          : 'Call ended';
+      final messenger = ScaffoldMessenger.of(context);
+      final route = ModalRoute.of(context);
+      if (route?.isCurrent ?? false) Navigator.of(context).pop();
+      messenger
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            content: Text(label, style: tx(14, color: Colors.white)),
+          ),
+        );
+      return;
+    }
     // Turn new reactions into floating emojis.
     for (final r in [...call.reactions]) {
       call.consumeReaction(r);
@@ -101,6 +123,7 @@ class _CallScreenState extends State<CallScreen> with TickerProviderStateMixin {
     final label = call.connected
         ? 'Call ended · ${call.elapsedLabel}'
         : 'Call cancelled';
+    _closing = true;
     call.end();
     final messenger = ScaffoldMessenger.of(context);
     Navigator.of(context).pop();
@@ -207,7 +230,8 @@ class _CallScreenState extends State<CallScreen> with TickerProviderStateMixin {
               enabled: !call.isGroup,
               onTap: () {
                 Navigator.pop(ctx); // close the menu
-                final friend = call.participants.first.person;
+                final friend = call.participants.firstOrNull?.person;
+                if (friend == null) return;
                 final nav = Navigator.of(context);
                 nav.pop(); // minimize the call (green bar)
                 call.setScreenOpen(false);
@@ -348,7 +372,11 @@ class _CallScreenState extends State<CallScreen> with TickerProviderStateMixin {
         _at(
           center,
           86,
-          _personDisc(call.participants.first.person, 86, ring: true),
+          _personDisc(
+            call.participants.firstOrNull?.person ?? call.me,
+            86,
+            ring: true,
+          ),
         ),
       );
       return widgets;
@@ -485,28 +513,30 @@ class _CallScreenState extends State<CallScreen> with TickerProviderStateMixin {
                   ),
               ],
             ),
-            child: video
-                ? Container(
-                    decoration: const BoxDecoration(
-                      shape: BoxShape.circle,
-                      gradient: LinearGradient(
-                        colors: [Color(0xFF2B2B2B), Color(0xFF555555)],
-                      ),
-                    ),
-                    child: Icon(
-                      Icons.videocam_rounded,
-                      color: Colors.white,
-                      size: size * .36,
-                    ),
-                  )
-                : Container(
-                    decoration: const BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: AppColors.bubble,
-                    ),
-                    alignment: Alignment.center,
-                    child: PersonAvatar(p, diameter: size * .82),
-                  ),
+            child:
+                _liveVideo(p) ??
+                (video
+                    ? Container(
+                        decoration: const BoxDecoration(
+                          shape: BoxShape.circle,
+                          gradient: LinearGradient(
+                            colors: [Color(0xFF2B2B2B), Color(0xFF555555)],
+                          ),
+                        ),
+                        child: Icon(
+                          Icons.videocam_rounded,
+                          color: Colors.white,
+                          size: size * .36,
+                        ),
+                      )
+                    : Container(
+                        decoration: const BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: AppColors.bubble,
+                        ),
+                        alignment: Alignment.center,
+                        child: PersonAvatar(p, diameter: size * .82),
+                      )),
           ),
           Positioned(
             right: size * .02,
@@ -527,6 +557,21 @@ class _CallScreenState extends State<CallScreen> with TickerProviderStateMixin {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  /// Live camera of [p] in a real call (null if off or in the demo).
+  Widget? _liveVideo(Person p) {
+    final track = call.link?.videoTrackOf(p);
+    if (track is! VideoTrack) return null;
+    return ClipOval(
+      child: VideoTrackRenderer(
+        track,
+        fit: VideoViewFit.cover,
+        mirrorMode: p.id == call.me.id
+            ? VideoViewMirrorMode.mirror
+            : VideoViewMirrorMode.off,
       ),
     );
   }

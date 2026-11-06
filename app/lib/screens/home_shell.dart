@@ -4,6 +4,7 @@ import '../chat_store.dart';
 import '../games/challenge.dart';
 import '../theme.dart';
 import 'chat_home.dart';
+import 'incoming_call_screen.dart';
 import 'map_screen.dart';
 import 'profile_screen.dart';
 import 'video_feed.dart';
@@ -37,6 +38,9 @@ class _HomeShellState extends State<HomeShell> {
     // Online: live invites and notices from other phones.
     final online = widget.store.online;
     if (online != null) {
+      online.onIncomingCall = (call) {
+        if (mounted) IncomingCallScreen.show(context, widget.store, call);
+      };
       online.onInvite = (m) {
         if (mounted) showInvite(context, widget.store, m);
       };

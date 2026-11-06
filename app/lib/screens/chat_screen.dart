@@ -57,11 +57,14 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   void _startCall({bool video = false}) {
-    final call = widget.store.startCall(
-      node.members,
-      groupName: node.isGroup ? node.displayName : null,
-      video: video,
-    );
+    final online = widget.store.online;
+    final call = online != null
+        ? online.startCall(node, video: video) // real call: rings their phone
+        : widget.store.startCall(
+            node.members,
+            groupName: node.isGroup ? node.displayName : null,
+            video: video,
+          );
     CallScreen.open(context, widget.store, call);
   }
 
@@ -299,6 +302,26 @@ class _ChatScreenState extends State<ChatScreen> {
 
   Widget _bubbleContent(Message m) {
     if (m.game != null) return _gameCard(m);
+    if (m.isEvent) {
+      return Center(
+        child: Container(
+          margin: const EdgeInsets.only(bottom: 10),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: .7),
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Text(
+            '${m.text}  ·  ${_time(m.time)}',
+            style: tx(
+              12,
+              weight: FontWeight.w600,
+              color: const Color(0xFF555555),
+            ),
+          ),
+        ),
+      );
+    }
     switch (m.kind) {
       case MessageKind.image:
         return ImageBubble(message: m, mine: m.isMine);

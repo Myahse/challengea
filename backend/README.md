@@ -121,6 +121,23 @@ The server keeps the state and checks every move (turns, full columns,
 Sudoku answers). The Sudoku solution never leaves the server. When a match
 ends, the result is posted in the players' chat (`game_result` message).
 
+### Calls
+
+Audio and video go through **LiveKit** (WebRTC media server, in
+`docker-compose.yml`). The API rings people and hands out room tokens.
+
+| Method | Path | |
+|---|---|---|
+| POST | `/api/calls` | `{conversationId, video}`: rings the other members (`call.incoming`), returns `{call, url, token}` to join LiveKit |
+| POST | `/api/calls/{id}/accept` | Join: returns `{call, url, token}` |
+| POST | `/api/calls/{id}/decline` | `call.declined` to the caller; nobody left to answer → missed call |
+| POST | `/api/calls/{id}/leave` | The last one out ends the call |
+| POST | `/api/calls/{id}/invite` | `{userIds}`: ring more friends (1-to-1 becomes a group call) |
+
+When a call ends, the chat gets "📞 Voice call · 3:12" or "📵 Missed call".
+LiveKit settings: `LIVEKIT_URL` (what phones connect to, e.g.
+`ws://192.168.1.20:7880`), `LIVEKIT_API_KEY`, `LIVEKIT_API_SECRET` (32+ chars).
+
 ### Real-time events
 
 Connect with STOMP to `ws://host:8080/ws`, send `Authorization: Bearer <token>`
@@ -129,7 +146,8 @@ in the CONNECT frame, subscribe to `/user/queue/events`. Each event is
 
 `message.new`, `message.read`, `conversation.added`, `conversation.updated`,
 `conversation.removed`, `friend.request`, `friend.accepted`,
-`location.updated`, `location.hidden`, `match.invited`, `match.updated`.
+`location.updated`, `location.hidden`, `match.invited`, `match.updated`,
+`call.incoming`, `call.updated`, `call.declined`, `call.ended`.
 
 ## Not done yet
 
@@ -138,6 +156,8 @@ in the CONNECT frame, subscribe to `/user/queue/events`. Each event is
 - **Media storage at scale**: photos and voice notes are stored in Oracle
   (BLOB) for now; move them to object storage (OCI Object Storage / S3) when
   usage grows. Videos are not supported yet.
-- **Calls**: a LiveKit (WebRTC) server; the API will issue room tokens.
+- **Calls at scale**: who is in a call is kept in the API's memory (one
+  instance); use LiveKit webhooks when running several instances. Production
+  LiveKit needs a public IP / TURN server for phones on mobile networks.
 - **Videos, comments, shop and payments** (CinetPay / Wave / mobile money).
 - **Push notifications** (FCM) when the app is closed.

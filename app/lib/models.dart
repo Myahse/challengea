@@ -27,6 +27,7 @@ class Message {
     this.game,
     this.serverId,
     this.isChallenge = false,
+    this.isEvent = false,
     this.kind = MessageKind.text,
     this.mediaUrl,
     this.localPath,
@@ -57,6 +58,7 @@ class Message {
     game: server.game,
     serverId: server.serverId,
     isChallenge: server.isChallenge,
+    isEvent: server.isEvent,
     kind: server.kind,
     mediaUrl: server.mediaUrl,
     localPath: localPath,
@@ -67,6 +69,9 @@ class Message {
 
   /// A challenge invite (not a result): the card shows no Rematch button.
   final bool isChallenge;
+
+  /// A call log line ("📞 Voice call · 3:12"): shown centered, not as a bubble.
+  final bool isEvent;
   final String text;
 
   /// Id in the backend (null in demo mode or while sending).

@@ -34,6 +34,11 @@ app:
   cors:
     # Web app origins allowed to call the API (comma-separated). Lock this down in production.
     allowed-origins: ${CORS_ORIGINS:http://localhost:*,http://127.0.0.1:*}
+  livekit:
+    # LiveKit media server (WebRTC). The URL is what phones connect to.
+    url: ${LIVEKIT_URL:ws://localhost:7880}
+    api-key: ${LIVEKIT_API_KEY:devkey}
+    api-secret: ${LIVEKIT_API_SECRET:challengea-livekit-dev-secret-change-me}
   otp:
     ttl: 5m
     # Dev only: return the SMS code in the API response (no SMS provider yet).

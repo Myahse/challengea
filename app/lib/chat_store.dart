@@ -204,13 +204,19 @@ class ChatStore extends ChangeNotifier {
     String? groupName,
     bool video = false,
   }) {
-    call?.end();
     final c = CallSession(
       people: people,
       me: me,
       groupName: groupName,
       video: video,
     );
+    adoptCall(c);
+    return c;
+  }
+
+  /// Makes [c] the current call (ends any other one).
+  void adoptCall(CallSession c) {
+    if (!identical(call, c)) call?.end();
     c.addListener(() {
       if (c.ended && identical(call, c)) {
         call = null;
@@ -219,7 +225,6 @@ class ChatStore extends ChangeNotifier {
     });
     call = c;
     notifyListeners();
-    return c;
   }
 
   /// Real GPS position (installed app). Null until the phone shares it.

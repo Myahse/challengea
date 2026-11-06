@@ -15,8 +15,10 @@ Prototype of the **Challengea** screens (MOBILE section of the Figma file
    people around you; `+` spots invite more people (a 1-to-1 call becomes a
    group call), emoji reactions float up, Camera / Mute / Speaker / guests,
    and `⌄` minimizes the call behind a green "Tap to return to call" bar.
-   Prototype only: no audio yet. The real app will plug a WebRTC service
-   (e.g. LiveKit) into `lib/call.dart`; the screen stays the same.
+   Signed in, calls are real: the friend's phone rings full screen (Accept /
+   Decline), audio and video go through LiveKit (`lib/api/live_call.dart`),
+   reactions are shared with everyone in the call, and the chat logs
+   "📞 Voice call · 3:12" or "📵 Missed call". In the demo they're simulated.
 
 5. **Videos** (3rd dot): full-screen vertical feed. Swipe up for the next
    video, double-tap to like, tap to pause, tap the caption to expand it.

@@ -316,8 +316,13 @@ class _MapScreenState extends State<MapScreen> {
               mutuals: mutuals,
               scroll: scroll,
               onMessage: () => _openChat(s.person),
-              onCall: () =>
-                  CallScreen.open(context, store, store.startCall([s.person])),
+              onCall: () => CallScreen.open(
+                context,
+                store,
+                store.online != null
+                    ? store.online!.startCall(store.nodeFor(s.person))
+                    : store.startCall([s.person]),
+              ),
               onChallenge: () => challengeFriend(context, store, s.person),
               onRoute: () => _showRoute(s),
               onOpenProfile: () => ProfileScreen.open(

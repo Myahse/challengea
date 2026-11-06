@@ -5,11 +5,13 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:latlong2/latlong.dart';
 
+import '../call.dart';
 import '../chat_store.dart';
 import '../games/games.dart';
 import '../geo.dart';
 import '../models.dart';
 import 'api_client.dart';
+import 'live_call.dart';
 import 'realtime.dart';
 import 'session_store.dart';
 
@@ -59,8 +61,14 @@ class OnlineSync {
   final List<Person> incoming = [];
   final Map<int, OnlineMatch> matches = {};
 
+  /// Calls that ended (so a ringing screen for them closes itself).
+  final Set<int> endedCalls = {};
+
   /// Set by the UI: a friend challenged me / something to tell the user.
   void Function(OnlineMatch match)? onInvite;
+
+  /// Set by the UI: someone is calling me.
+  void Function(IncomingCall call)? onIncomingCall;
   void Function(String text)? onNotice;
 
   /// The conversation currently open on screen (its messages count as read).
@@ -147,6 +155,10 @@ class OnlineSync {
   }
 
   int idOf(Person p) => int.parse(p.id.substring(1));
+
+  /// A person I already know, by id like "u12".
+  Person? personById(String id) =>
+      id.startsWith('u') ? _people[int.tryParse(id.substring(1)) ?? -1] : null;
   bool isMe(Person p) => p.id == 'u$myId';
 
   static Color _color(String? hex) {
@@ -191,6 +203,7 @@ class OnlineSync {
           ?.map((v) => (v as num).toDouble())
           .toList(),
       isChallenge: isChallenge,
+      isEvent: type == 'system' && meta?['kind'] == 'call',
       sender: senderId == myId
           ? null
           : (sender ?? Person('u$senderId', '…', const Color(0xFF999999))),
@@ -647,6 +660,85 @@ class OnlineSync {
     }
   }
 
+  // ------------------------------------------------------------- calls
+  /// Starts a real call in this chat: rings the others, then joins the LiveKit room.
+  CallSession startCall(BubbleNode n, {bool video = false}) {
+    final session = CallSession(
+      people: [...n.members],
+      me: store.me,
+      groupName: n.isGroup ? n.displayName : null,
+      video: video,
+      simulate: false,
+    );
+    store.adoptCall(session);
+    () async {
+      try {
+        await _ready(n);
+        final join =
+            await api.post('/calls', {
+                  'conversationId': n.serverId,
+                  'video': video,
+                })
+                as Map<String, dynamic>;
+        await _connect(session, join);
+      } on ApiError catch (e) {
+        onNotice?.call(e.message);
+        session.end();
+      }
+    }();
+    return session;
+  }
+
+  /// Answers a call: joins the room.
+  CallSession acceptCall(IncomingCall call) {
+    final session = CallSession(
+      people: [call.from],
+      me: store.me,
+      groupName: call.groupName,
+      video: call.video,
+      simulate: false,
+    );
+    store.adoptCall(session);
+    () async {
+      try {
+        final join =
+            await api.post('/calls/${call.id}/accept') as Map<String, dynamic>;
+        await _connect(session, join);
+      } on ApiError catch (e) {
+        onNotice?.call(e.message);
+        session.end();
+      }
+    }();
+    return session;
+  }
+
+  Future<void> declineCall(IncomingCall call) =>
+      _quiet(() => api.post('/calls/${call.id}/decline'));
+
+  Future<void> _connect(CallSession session, Map<String, dynamic> join) async {
+    if (session.ended) return; // hung up while ringing
+    final call = join['call'] as Map<String, dynamic>;
+    final live = LiveCall(this, (call['id'] as num).toInt(), session);
+    final error = await live.connect(
+      join['url'] as String,
+      join['token'] as String,
+    );
+    if (error != null) {
+      onNotice?.call(error);
+      session.end();
+    }
+  }
+
+  void inviteToCall(int callId, Person p) => _act(
+    () => api.post('/calls/$callId/invite', {
+      'userIds': [idOf(p)],
+    }),
+  );
+
+  void leaveCall(int callId) => _quiet(() => api.post('/calls/$callId/leave'));
+
+  int? _callIdOf(CallSession? s) => (s?.link as LiveCall?)?.callId;
+
   // ------------------------------------------------------------- live events
   void _onEvent(String type, dynamic data) {
     final d = data is Map ? data.cast<String, dynamic>() : <String, dynamic>{};
@@ -683,6 +775,35 @@ class OnlineSync {
         onInvite?.call(m);
       case 'match.updated':
         _applyMatch(d);
+      case 'call.incoming':
+        final from = personFrom(d['startedBy'] as Map<String, dynamic>);
+        final node = store.nodes
+            .where((n) => n.serverId == d['conversationId'])
+            .firstOrNull;
+        onIncomingCall?.call(
+          IncomingCall(
+            id: (d['id'] as num).toInt(),
+            from: from,
+            video: d['video'] == true,
+            groupName: node != null && node.isGroup ? node.displayName : null,
+          ),
+        );
+      case 'call.declined':
+        final call = store.call;
+        if (call != null &&
+            _callIdOf(call) == d['callId'] &&
+            !call.isGroup &&
+            !call.connected) {
+          onNotice?.call(
+            '${call.participants.firstOrNull?.person.firstName ?? 'They'} declined',
+          );
+          call.end();
+        }
+      case 'call.ended':
+        final id = (d['callId'] as num).toInt();
+        endedCalls.add(id);
+        final call = store.call;
+        if (call != null && _callIdOf(call) == id) call.end();
     }
   }
 
@@ -738,4 +859,18 @@ class OnlineSync {
       return null;
     }
   }
+}
+
+/// Someone is calling me.
+class IncomingCall {
+  IncomingCall({
+    required this.id,
+    required this.from,
+    required this.video,
+    this.groupName,
+  });
+  final int id;
+  final Person from;
+  final bool video;
+  final String? groupName;
 }

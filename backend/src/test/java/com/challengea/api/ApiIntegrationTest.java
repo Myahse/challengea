@@ -218,6 +218,70 @@ class ApiIntegrationTest {
   }
 
   @Test
+  void callsRingAnswerAndLeaveAMessage() throws Exception {
+    var me = signUp("Caller");
+    var friend = signUp("Callee");
+    befriend(me, friend);
+    var chat = post("/conversations/direct/" + friend.id(), null, me.token());
+    var events = listen(friend);
+
+    var started = post("/calls", Map.of("conversationId", chat.get("id"), "video", false), me.token());
+    var call = (Map<String, Object>) started.get("call");
+    assertThat(started.get("url").toString()).startsWith("ws");
+    // The LiveKit token names the room and me.
+    var claims = decodeJwt((String) started.get("token"));
+    assertThat(claims.get("sub")).isEqualTo("u" + me.id());
+    assertThat(((Map<String, Object>) claims.get("video")).get("room")).isEqualTo("call-" + call.get("id"));
+
+    var ring = next(events, "call.incoming");
+    assertThat(((Map<String, Object>) ring.get("data")).get("id")).isEqualTo(call.get("id"));
+
+    var joined = post("/calls/" + call.get("id") + "/accept", null, friend.token());
+    assertThat(((Map<String, Object>) joined.get("call")).get("status")).isEqualTo("active");
+    post("/calls/" + call.get("id") + "/leave", null, friend.token());
+    post("/calls/" + call.get("id") + "/leave", null, me.token());
+    var last = get("/conversations/" + chat.get("id") + "/messages?limit=1", me.token(),
+        new ParameterizedTypeReference<List<Map<String, Object>>>() {}).getFirst();
+    assertThat(last.get("body").toString()).startsWith("📞 Voice call · 0:");
+
+    // A declined call becomes a missed call.
+    var second = (Map<String, Object>) post("/calls", Map.of("conversationId", chat.get("id"), "video", true), me.token()).get("call");
+    post("/calls/" + second.get("id") + "/decline", null, friend.token());
+    var missed = get("/conversations/" + chat.get("id") + "/messages?limit=1", me.token(),
+        new ParameterizedTypeReference<List<Map<String, Object>>>() {}).getFirst();
+    assertThat(missed.get("body")).isEqualTo("📵 Missed video call");
+
+    var stranger = signUp("Stranger");
+    assertThatThrownBy(() -> post("/calls/" + second.get("id") + "/accept", null, stranger.token()))
+        .isInstanceOf(HttpClientErrorException.NotFound.class);
+  }
+
+  private static Map<String, Object> decodeJwt(String token) throws Exception {
+    var payload = java.util.Base64.getUrlDecoder().decode(token.split("\\.")[1]);
+    return new com.fasterxml.jackson.databind.ObjectMapper().readValue(payload, Map.class);
+  }
+
+  /** Connects [who] to the WebSocket and collects their events. */
+  private BlockingQueue<Map<String, Object>> listen(Account who) throws Exception {
+    var events = new LinkedBlockingQueue<Map<String, Object>>();
+    var stomp = new WebSocketStompClient(new StandardWebSocketClient());
+    stomp.setMessageConverter(new JacksonJsonMessageConverter());
+    var connect = new StompHeaders();
+    connect.add("Authorization", "Bearer " + who.token());
+    var session = stomp.connectAsync("ws://localhost:" + port + "/ws", new WebSocketHttpHeaders(), connect,
+        new StompSessionHandlerAdapter() {}).get(10, TimeUnit.SECONDS);
+    session.subscribe("/user/queue/events", new StompFrameHandler() {
+      @Override
+      public Type getPayloadType(StompHeaders headers) { return Map.class; }
+
+      @Override
+      public void handleFrame(StompHeaders headers, Object payload) { events.add((Map<String, Object>) payload); }
+    });
+    Thread.sleep(300);
+    return events;
+  }
+
+  @Test
   void ghostModeHidesMeFromTheMap() {
     var me = signUp("Me");
     var friend = signUp("Friend");
