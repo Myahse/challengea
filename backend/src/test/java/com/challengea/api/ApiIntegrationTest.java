@@ -27,7 +27,7 @@ import org.springframework.web.socket.client.standard.StandardWebSocketClient;
 import org.springframework.web.socket.messaging.WebSocketStompClient;
 
 /** End-to-end: HTTP + WebSocket against a real Oracle 23ai. */
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = "mock.enabled=false")
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = {"mock.enabled=false", "app.bot.enabled=true", "app.bot.delay=10ms"})
 @Import(TestDatabase.class)
 @SuppressWarnings("unchecked")
 class ApiIntegrationTest {
@@ -509,5 +509,78 @@ class ApiIntegrationTest {
     post("/stories", Map.of("body", "Hi"), author.token());
     var story = (Map<String, Object>) next(events, "story.new").get("data");
     assertThat(((Number) story.get("userId")).longValue()).isEqualTo(author.id());
+  }
+
+  /** A demo-cast account: it plays back on its own. */
+  Account signUpBot(String name) {
+    var res = post("/auth/register", Map.of("email", UUID.randomUUID() + "@mock.challengea", "password", "secret123",
+        "displayName", name), null);
+    var user = (Map<String, Object>) res.get("user");
+    return new Account(((Number) user.get("id")).longValue(), (String) res.get("token"));
+  }
+
+  Map<String, Object> awaitMatch(Object id, String token, java.util.function.Predicate<Map<String, Object>> done)
+      throws Exception {
+    var type = new ParameterizedTypeReference<Map<String, Object>>() {};
+    for (var i = 0; i < 400; i++) {
+      var match = get("/matches/" + id, token, type);
+      if (done.test(match)) return match;
+      Thread.sleep(25);
+    }
+    throw new AssertionError("The match did not get there: " + get("/matches/" + id, token, type));
+  }
+
+  @Test
+  void demoFriendAcceptsAndPlaysFourInARow() throws Exception {
+    var me = signUp("Player");
+    var bot = signUpBot("Bot");
+    befriend(me, bot);
+    var id = post("/matches", Map.of("gameId", "arcade", "opponentId", bot.id()), me.token()).get("id");
+    var active = awaitMatch(id, me.token(), m -> "active".equals(m.get("status")));
+    assertThat(((Number) active.get("currentTurnId")).longValue()).isEqualTo(me.id());
+
+    // Each of my moves gets an answer, until someone wins or the board is full.
+    var match = active;
+    for (var i = 0; i < 21 && "active".equals(match.get("status")); i++) {
+      var col = firstOpenColumn(match);
+      var moves = ((Number) ((Map<String, Object>) match.get("state")).get("moves")).intValue();
+      post("/matches/" + id + "/moves", Map.of("col", col), me.token());
+      match = awaitMatch(id, me.token(), m -> !"active".equals(m.get("status"))
+          || ((Number) ((Map<String, Object>) m.get("state")).get("moves")).intValue() == moves + 2);
+    }
+    assertThat(match.get("status")).isEqualTo("finished");
+  }
+
+  int firstOpenColumn(Map<String, Object> match) {
+    var cells = (List<List<Number>>) ((Map<String, Object>) match.get("state")).get("cells");
+    for (var c = 0; c < 7; c++) {
+      if (cells.getFirst().get(c).intValue() == 0) return c;
+    }
+    throw new AssertionError("Board is full");
+  }
+
+  @Test
+  void demoFriendRacesYouAtSudoku() throws Exception {
+    var me = signUp("Player");
+    var bot = signUpBot("Bot");
+    befriend(me, bot);
+    var id = post("/matches", Map.of("gameId", "sudoku", "opponentId", bot.id()), me.token()).get("id");
+    var done = awaitMatch(id, me.token(), m -> "finished".equals(m.get("status")));
+    assertThat(((Number) done.get("winnerId")).longValue()).isEqualTo(bot.id());
+
+    var chat = post("/conversations/direct/" + bot.id(), null, me.token());
+    var messages = get("/conversations/" + chat.get("id") + "/messages", me.token(), LIST);
+    assertThat(messages).extracting(m -> m.get("type")).contains("game_result");
+  }
+
+  @Test
+  void aRealPersonIsNeverPlayedByTheBot() throws Exception {
+    var me = signUp("Player");
+    var friend = signUp("Friend");
+    befriend(me, friend);
+    var id = post("/matches", Map.of("gameId", "arcade", "opponentId", friend.id()), me.token()).get("id");
+    Thread.sleep(200);
+    var match = get("/matches/" + id, me.token(), new ParameterizedTypeReference<Map<String, Object>>() {});
+    assertThat(match.get("status")).isEqualTo("invited");
   }
 }

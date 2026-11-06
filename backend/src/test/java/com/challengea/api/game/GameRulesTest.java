@@ -42,4 +42,16 @@ class GameRulesTest {
     assertThat(FourInRow.drop(cells, 0, 1)).isEqualTo(-1);
     assertThat(FourInRow.drop(cells, 9, 1)).isEqualTo(-1);
   }
+
+  @Test
+  void botTakesAWinAndBlocksOne() {
+    var random = new java.util.Random(1);
+    var win = FourInRow.empty();
+    for (var c = 0; c < 3; c++) FourInRow.drop(win, c, 2);
+    org.assertj.core.api.Assertions.assertThat(GameBot.pickColumn(win, random)).isEqualTo(3);
+
+    var block = FourInRow.empty();
+    for (var c = 1; c < 4; c++) FourInRow.drop(block, c, 1);
+    org.assertj.core.api.Assertions.assertThat(GameBot.pickColumn(block, random)).isIn(0, 4);
+  }
 }

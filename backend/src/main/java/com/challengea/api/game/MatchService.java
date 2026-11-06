@@ -13,6 +13,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ThreadLocalRandom;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -27,9 +28,10 @@ public class MatchService {
   private final UserService users;
   private final ChatService chat;
   private final Events events;
+  private final ApplicationEventPublisher published;
 
   public MatchService(GameRepository games, MatchRepository matches, MoveRepository moves, FriendService friends,
-      UserService users, ChatService chat, Events events) {
+      UserService users, ChatService chat, Events events, ApplicationEventPublisher published) {
     this.games = games;
     this.matches = matches;
     this.moves = moves;
@@ -37,7 +39,11 @@ public class MatchService {
     this.users = users;
     this.chat = chat;
     this.events = events;
+    this.published = published;
   }
+
+  /** Something happened in a match. */
+  public record MatchChanged(long matchId) {}
 
   /** What a player sees. The Sudoku solution never leaves the server. */
   public record MatchDto(long id, String gameId, String status, UserDto challenger, UserDto opponent,
@@ -59,6 +65,7 @@ public class MatchService {
     chat.post(chat.directId(me, opponentId), me, "system", name + " challenged you to " + game.getName(),
         Map.of("kind", "challenge", "matchId", match.getId(), "gameId", gameId));
     events.send(opponentId, "match.invited", dto);
+    published.publishEvent(new MatchChanged(match.getId()));
     return dto;
   }
 
@@ -198,6 +205,7 @@ public class MatchService {
   private MatchDto broadcast(Match m, long me) {
     events.send(m.getChallengerId(), "match.updated", view(m, m.getChallengerId()));
     events.send(m.getOpponentId(), "match.updated", view(m, m.getOpponentId()));
+    published.publishEvent(new MatchChanged(m.getId()));
     return view(m, me);
   }
 
@@ -262,7 +270,7 @@ public class MatchService {
   }
 
   @SuppressWarnings("unchecked")
-  private static int[][] toGrid(Object o) {
+  static int[][] toGrid(Object o) {
     var rows = (List<Object>) o;
     var grid = new int[FourInRow.ROWS][FourInRow.COLS];
     for (var r = 0; r < FourInRow.ROWS; r++) {

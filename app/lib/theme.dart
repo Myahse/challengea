@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'widgets/motion.dart';
 
@@ -78,10 +79,35 @@ TextStyle tx(double size, {FontWeight weight = FontWeight.w400, Color? color}) {
   );
 }
 
-/// Rebuilds [builder] when the phone switches between light and dark.
+enum ThemeChoice { system, light, dark }
+
+/// Rebuilds [builder] when the phone switches between light and dark, or when
+/// the choice in Account changes.
 class FollowDeviceTheme extends StatefulWidget {
   const FollowDeviceTheme({super.key, required this.builder});
   final WidgetBuilder builder;
+
+  static final choice = ValueNotifier(ThemeChoice.system);
+  static const _key = 'theme';
+
+  static Future<void> choose(ThemeChoice c) async {
+    choice.value = c;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_key, c.name);
+  }
+
+  static Future<void> _load() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final saved = prefs.getString(_key);
+      choice.value = ThemeChoice.values.firstWhere(
+        (c) => c.name == saved,
+        orElse: () => ThemeChoice.system,
+      );
+    } on Exception {
+      // No saved choice available: follow the device.
+    }
+  }
 
   @override
   State<FollowDeviceTheme> createState() => _FollowDeviceThemeState();
@@ -90,27 +116,19 @@ class FollowDeviceTheme extends StatefulWidget {
 class _FollowDeviceThemeState extends State<FollowDeviceTheme>
     with WidgetsBindingObserver {
   void _read() {
-    AppColors.dark =
+    AppColors.dark = switch (FollowDeviceTheme.choice.value) {
+      ThemeChoice.light => false,
+      ThemeChoice.dark => true,
+      ThemeChoice.system =>
         WidgetsBinding.instance.platformDispatcher.platformBrightness ==
-        Brightness.dark;
+            Brightness.dark,
+    };
   }
 
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addObserver(this);
+  void _apply() {
+    final before = AppColors.dark;
     _read();
-  }
-
-  @override
-  void dispose() {
-    WidgetsBinding.instance.removeObserver(this);
-    super.dispose();
-  }
-
-  @override
-  void didChangePlatformBrightness() {
-    _read();
+    if (before == AppColors.dark || !mounted) return;
     // Colors are read while building, so even const widgets must rebuild.
     void mark(Element e) {
       e.markNeedsBuild();
@@ -120,6 +138,25 @@ class _FollowDeviceThemeState extends State<FollowDeviceTheme>
     setState(() {});
     (context as Element).visitChildren(mark);
   }
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    FollowDeviceTheme.choice.addListener(_apply);
+    _read();
+    FollowDeviceTheme._load();
+  }
+
+  @override
+  void dispose() {
+    FollowDeviceTheme.choice.removeListener(_apply);
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangePlatformBrightness() => _apply();
 
   @override
   Widget build(BuildContext context) => widget.builder(context);

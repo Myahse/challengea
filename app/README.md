@@ -42,8 +42,8 @@ looks like: navigation is the floating menu (Home, Chats, +, Videos, Map).
    - **Arcade = Four in a row**: turn by turn, falling discs, the friend
      blocks your lines.
    - Rumble dash and Purple raw: "soon".
-   The friend's moves are simulated for now; online matches need the backend
-   (invites by push notification, moves over WebSocket).
+   In the demo the app plays the friend. Signed in, the demo cast accept and
+   play on the server, so a real match can be tested with one phone.
 
 Signed in, the home feed (posts, reactions, comments) and stories come from
 the server: friends see them, with live updates. The Videos page still shows
@@ -139,3 +139,4 @@ screen ("Test server: your code is …").
 - `lib/screens/sign_in_screen.dart` — phone / email sign-in
 - `lib/theme.dart` — colors and text styles, light and dark (one place to update)
 - `lib/widgets/glass.dart` — frosted surfaces, glossy bubbles, text links
+- `lib/screens/account_screen.dart` — account and settings (gear on my profile): edit profile, friends, privacy, appearance, sign out

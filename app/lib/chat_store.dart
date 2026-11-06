@@ -105,6 +105,7 @@ class ChatStore extends ChangeNotifier {
   void setMyName(String name) {
     if (name.trim().isEmpty) return;
     me = Person(me.id, name.trim(), me.color);
+    feed.me.person = me;
     notifyListeners();
   }
 

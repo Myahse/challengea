@@ -8,6 +8,7 @@ import '../widgets/avatar.dart';
 import '../widgets/fake_video.dart';
 import '../widgets/glass.dart';
 import '../widgets/motion.dart';
+import 'account_screen.dart';
 import 'chat_screen.dart';
 import 'video_feed.dart';
 
@@ -87,86 +88,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
         content: Text(text, style: tx(14, color: Colors.white)),
       ),
     );
-
-  /// My profile: change name and bio; sign out (online).
-  void _editProfile() {
-    final online = widget.store.online;
-    if (online == null) {
-      _snack('Sign in to edit your profile (this is the demo)');
-      return;
-    }
-    final name = TextEditingController(text: c.person.name);
-    final bio = TextEditingController(text: c.bio);
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      showDragHandle: true,
-      backgroundColor: AppColors.card,
-      builder: (ctx) => Padding(
-        padding: EdgeInsets.fromLTRB(
-          20,
-          0,
-          20,
-          20 + MediaQuery.viewInsetsOf(ctx).bottom,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(
-              'Edit profile',
-              textAlign: TextAlign.center,
-              style: tx(18, weight: FontWeight.w700),
-            ),
-            const SizedBox(height: 14),
-            TextField(
-              controller: name,
-              decoration: const InputDecoration(labelText: 'Name'),
-            ),
-            const SizedBox(height: 10),
-            TextField(
-              controller: bio,
-              maxLines: 3,
-              maxLength: 500,
-              decoration: const InputDecoration(labelText: 'Bio'),
-            ),
-            const SizedBox(height: 10),
-            FilledButton(
-              style: FilledButton.styleFrom(
-                backgroundColor: AppColors.accent,
-                minimumSize: const Size.fromHeight(50),
-              ),
-              onPressed: () async {
-                Navigator.pop(ctx);
-                try {
-                  await online.api.patch('/me', {
-                    'displayName': name.text.trim(),
-                    'bio': bio.text.trim(),
-                  });
-                  widget.store.setMyName(name.text.trim());
-                  setState(() => c.bio = bio.text.trim());
-                  _snack('Profile saved');
-                } catch (e) {
-                  _snack('$e');
-                }
-              },
-              child: const Text('Save'),
-            ),
-            TextButton(
-              onPressed: () {
-                Navigator.pop(ctx);
-                widget.store.onSignOut?.call();
-              },
-              child: Text(
-                'Sign out',
-                style: tx(15, weight: FontWeight.w600, color: AppColors.danger),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 
   void _message() {
     final node = widget.store.nodeFor(c.person);
@@ -250,6 +171,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ),
                 ],
               ),
+              if (c.isMe)
+                Positioned(
+                  right: 12,
+                  top: top + 8,
+                  child: Glass(
+                    radius: 24,
+                    child: IconButton(
+                      tooltip: 'Account and settings',
+                      onPressed: () =>
+                          AccountScreen.open(context, widget.store),
+                      icon: const Icon(Icons.settings_outlined, size: 22),
+                    ),
+                  ),
+                ),
               if (widget.pushed)
                 Positioned(
                   left: 12,
@@ -336,7 +271,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Widget _actions() {
-    if (c.isMe) return TextLink(label: 'Edit profile', onTap: _editProfile);
+    if (c.isMe) {
+      return TextLink(
+        label: 'Edit profile',
+        onTap: () => showEditProfile(
+          context,
+          widget.store,
+          onSaved: () => setState(() {}),
+        ),
+      );
+    }
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [

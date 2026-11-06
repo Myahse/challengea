@@ -164,7 +164,7 @@ class Creator {
     this.tagged = 0,
     this.isMe = false,
   });
-  final Person person;
+  Person person;
   final String handle;
   String bio;
   int followers;

@@ -8,6 +8,8 @@ import '../chat_store.dart';
 import '../models.dart';
 import '../theme.dart';
 import '../widgets/avatar.dart';
+import '../widgets/glass.dart';
+import '../widgets/motion.dart';
 import 'four_in_row_screen.dart';
 import 'games.dart';
 import 'sudoku_duel_screen.dart';
@@ -96,8 +98,7 @@ Future<void> challengeFriend(
 }
 
 /// Sends the challenge, waits for the friend to accept, then opens the game.
-/// Prototype: friends always accept after a moment. The backend will send a
-/// real invite (push notification) and start a shared match.
+/// Demo: friends always accept after a moment.
 Future<void> startChallenge(
   BuildContext context,
   ChatStore store,
@@ -219,45 +220,153 @@ class _WaitingDialogState extends State<_WaitingDialog> {
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      backgroundColor: AppColors.card,
-      contentPadding: const EdgeInsets.fromLTRB(24, 24, 24, 8),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              _GameIcon(widget.game, size: 48),
-              const SizedBox(width: 12),
-              const Icon(Icons.bolt_rounded, size: 30),
-              const SizedBox(width: 12),
-              PersonAvatar(widget.friend, diameter: 48),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Text(
-            _accepted
-                ? '${widget.friend.firstName} accepted!'
-                : 'Challenging ${widget.friend.firstName}…',
-            style: tx(17, weight: FontWeight.w700),
-          ),
-          const SizedBox(height: 6),
-          Text(widget.game.name, style: tx(13, color: AppColors.muted)),
-          const SizedBox(height: 16),
-          if (!_accepted)
-            LinearProgressIndicator(color: AppColors.ink)
-          else
-            const Icon(Icons.check_circle, color: AppColors.online, size: 30),
-        ],
-      ),
+    return _ChallengeCard(
+      person: widget.friend,
+      game: widget.game,
+      title: _accepted
+          ? '${widget.friend.firstName} accepted'
+          : 'Challenging ${widget.friend.firstName}',
+      subtitle: widget.game.name,
+      done: _accepted,
       actions: [
         if (!_accepted)
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
+          _CardButton(
+            label: 'Cancel challenge',
+            onTap: () => Navigator.pop(context, false),
           ),
       ],
+    );
+  }
+}
+
+/// The dialogs around a challenge: who, which game, and where it stands.
+class _ChallengeCard extends StatelessWidget {
+  const _ChallengeCard({
+    required this.person,
+    required this.game,
+    required this.title,
+    required this.subtitle,
+    required this.actions,
+    this.done = false,
+    this.waiting = true,
+  });
+  final Person person;
+  final GameInfo game;
+  final String title;
+  final String subtitle;
+  final bool done;
+  final bool waiting;
+  final List<Widget> actions;
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      backgroundColor: AppColors.card,
+      surfaceTintColor: Colors.transparent,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 28),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(22, 26, 22, 18),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            SizedBox(
+              width: 126,
+              height: 76,
+              child: Stack(
+                children: [
+                  Positioned(left: 0, child: _GameIcon(game, size: 76)),
+                  Positioned(
+                    right: 0,
+                    child: Floaty(child: PersonAvatar(person, diameter: 76)),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 18),
+            AnimatedSwitcher(
+              duration: Motion.normal,
+              child: Text(
+                title,
+                key: ValueKey(title),
+                textAlign: TextAlign.center,
+                style: tx(26, weight: FontWeight.w600),
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              subtitle,
+              textAlign: TextAlign.center,
+              style: tx(16, color: AppColors.muted),
+            ),
+            const SizedBox(height: 18),
+            if (waiting)
+              SizedBox(
+                height: 30,
+                child: Center(
+                  child: AnimatedSwitcher(
+                    duration: Motion.normal,
+                    child: done
+                        ? const Icon(
+                            Icons.check_circle_rounded,
+                            key: ValueKey('done'),
+                            color: AppColors.online,
+                            size: 30,
+                          )
+                        : ClipRRect(
+                            key: const ValueKey('waiting'),
+                            borderRadius: BorderRadius.circular(2),
+                            child: SizedBox(
+                              width: 120,
+                              child: LinearProgressIndicator(
+                                minHeight: 4,
+                                color: AppColors.accent,
+                                backgroundColor: AppColors.bubble,
+                              ),
+                            ),
+                          ),
+                  ),
+                ),
+              ),
+            for (final a in actions) ...[const SizedBox(height: 8), a],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _CardButton extends StatelessWidget {
+  const _CardButton({
+    required this.label,
+    required this.onTap,
+    this.primary = false,
+  });
+  final String label;
+  final VoidCallback? onTap;
+  final bool primary;
+
+  @override
+  Widget build(BuildContext context) {
+    return Pressable(
+      onTap: onTap,
+      child: Container(
+        height: 50,
+        width: double.infinity,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: primary ? AppColors.accent : AppColors.bubble,
+          borderRadius: BorderRadius.circular(25),
+        ),
+        child: Text(
+          label,
+          style: tx(
+            17,
+            weight: FontWeight.w500,
+            color: primary ? Colors.white : AppColors.ink,
+          ),
+        ),
+      ),
     );
   }
 }
@@ -324,43 +433,19 @@ Future<void> showInvite(
   HapticFeedback.heavyImpact();
   final accept = await showDialog<bool>(
     context: context,
-    builder: (ctx) => AlertDialog(
-      backgroundColor: AppColors.card,
-      contentPadding: const EdgeInsets.fromLTRB(24, 24, 24, 8),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              PersonAvatar(from, diameter: 52),
-              const SizedBox(width: 12),
-              const Icon(Icons.bolt_rounded, size: 30),
-              const SizedBox(width: 12),
-              _GameIcon(m.game, size: 52),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Text(
-            '${from.firstName} challenges you!',
-            textAlign: TextAlign.center,
-            style: tx(18, weight: FontWeight.w800),
-          ),
-          const SizedBox(height: 4),
-          Text(m.game.name, style: tx(14, color: AppColors.muted)),
-        ],
-      ),
-      actionsAlignment: MainAxisAlignment.center,
+    builder: (ctx) => _ChallengeCard(
+      person: from,
+      game: m.game,
+      title: '${from.firstName} challenges you',
+      subtitle: m.game.name,
+      waiting: false,
       actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(ctx, false),
-          child: const Text('Not now'),
+        _CardButton(
+          label: 'Play',
+          primary: true,
+          onTap: () => Navigator.pop(ctx, true),
         ),
-        FilledButton(
-          style: FilledButton.styleFrom(backgroundColor: AppColors.accent),
-          onPressed: () => Navigator.pop(ctx, true),
-          child: const Text('Play'),
-        ),
+        _CardButton(label: 'Not now', onTap: () => Navigator.pop(ctx, false)),
       ],
     ),
   );
@@ -387,6 +472,9 @@ class _OnlineWaitingDialog extends StatefulWidget {
 }
 
 class _OnlineWaitingDialogState extends State<_OnlineWaitingDialog> {
+  bool _closed = false;
+  bool _cancelling = false;
+
   @override
   void initState() {
     super.initState();
@@ -399,72 +487,50 @@ class _OnlineWaitingDialogState extends State<_OnlineWaitingDialog> {
     super.dispose();
   }
 
+  /// The server's answer and my button can both end this dialog: it must only
+  /// close once, or it would also close the page underneath.
+  void _close(bool accepted) {
+    if (_closed || !mounted) return;
+    _closed = true;
+    Navigator.pop(context, accepted);
+  }
+
   void _onChange() {
     if (!mounted) return;
     final s = widget.match.status;
     if (s == 'active') {
       setState(() {});
-      Future.delayed(const Duration(milliseconds: 600), () {
-        if (mounted) Navigator.pop(context, true);
-      });
+      Future.delayed(const Duration(milliseconds: 700), () => _close(true));
     } else if (s == 'declined' || s == 'cancelled') {
-      Navigator.pop(context, false);
+      _close(false);
     }
+  }
+
+  Future<void> _cancel() async {
+    setState(() => _cancelling = true);
+    await widget.online.decline(widget.match);
+    if (!mounted) return;
+    // They may have accepted at the same moment: then the game starts.
+    if (widget.match.status == 'active') return;
+    _close(false);
   }
 
   @override
   Widget build(BuildContext context) {
     final accepted = widget.match.status == 'active';
-    return AlertDialog(
-      backgroundColor: AppColors.card,
-      contentPadding: const EdgeInsets.fromLTRB(24, 24, 24, 8),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              _GameIcon(widget.match.game, size: 48),
-              const SizedBox(width: 12),
-              const Icon(Icons.bolt_rounded, size: 30),
-              const SizedBox(width: 12),
-              PersonAvatar(widget.friend, diameter: 48),
-            ],
-          ),
-          const SizedBox(height: 16),
-          AnimatedSwitcher(
-            duration: const Duration(milliseconds: 250),
-            child: Text(
-              accepted
-                  ? '${widget.friend.firstName} accepted!'
-                  : 'Waiting for ${widget.friend.firstName}…',
-              key: ValueKey(accepted),
-              style: tx(17, weight: FontWeight.w700),
-            ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            'They got a notification on their phone',
-            style: tx(12, color: AppColors.muted),
-          ),
-          const SizedBox(height: 16),
-          accepted
-              ? const Icon(
-                  Icons.check_circle,
-                  color: AppColors.online,
-                  size: 30,
-                )
-              : LinearProgressIndicator(color: AppColors.ink),
-        ],
-      ),
+    return _ChallengeCard(
+      person: widget.friend,
+      game: widget.match.game,
+      title: accepted
+          ? '${widget.friend.firstName} accepted'
+          : 'Waiting for ${widget.friend.firstName}',
+      subtitle: accepted ? 'Starting the game' : widget.match.game.name,
+      done: accepted,
       actions: [
         if (!accepted)
-          TextButton(
-            onPressed: () async {
-              await widget.online.decline(widget.match); // cancels my challenge
-              if (context.mounted) Navigator.pop(context, false);
-            },
-            child: const Text('Cancel'),
+          _CardButton(
+            label: _cancelling ? 'Cancelling' : 'Cancel challenge',
+            onTap: _cancelling ? null : _cancel,
           ),
       ],
     );

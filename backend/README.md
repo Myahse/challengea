@@ -145,6 +145,11 @@ You see your own posts and your friends'. Anything else answers `not_found`.
 | POST | `/api/matches/{id}/accept` / `decline` | |
 | POST | `/api/matches/{id}/moves` | Four in a row `{col}`; Sudoku `{cell, value}` |
 
+With the demo data on, the demo cast plays back (`GameBot`), so a game can be
+tested with one phone: challenge Marc or anyone else in the cast and they
+accept and play. It uses the same rules as people; real accounts are never
+played. `MOCK_DATA=false` turns it off.
+
 The server keeps the state and checks every move (turns, full columns,
 Sudoku answers). The Sudoku solution never leaves the server. When a match
 ends, the result is posted in the players' chat (`game_result` message).

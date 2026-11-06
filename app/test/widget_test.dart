@@ -3,6 +3,7 @@ import 'package:challengea/chat_store.dart';
 import 'dart:math';
 
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:challengea/games/challenge.dart';
 import 'package:challengea/games/four_logic.dart';
 import 'package:challengea/games/games.dart';
@@ -56,6 +57,36 @@ void main() {
     expect(AppColors.dark, isTrue);
     expect(AppColors.page, isNot(lightPage));
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('account opens from my profile and picks a theme', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({});
+    addTearDown(() => FollowDeviceTheme.choice.value = ThemeChoice.system);
+    tester.view.physicalSize = const Size(430, 932);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final store = ChatStore();
+    await tester.pumpWidget(
+      ChallengeaApp(
+        store: store,
+        home: ProfileScreen(store: store, creator: store.feed.me),
+      ),
+    );
+    await tester.pump(const Duration(seconds: 1));
+    await tester.tap(find.byTooltip('Account and settings'));
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 2));
+    expect(find.text('Ghost mode'), findsOneWidget);
+    expect(find.text('Device'), findsOneWidget);
+
+    await tester.tap(find.text('Dark'));
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(AppColors.dark, isTrue);
+    await tester.tap(find.text('Light'));
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(AppColors.dark, isFalse);
   });
 
   test('merging two friends creates a group, merging again adds to it', () {
