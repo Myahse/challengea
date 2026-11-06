@@ -265,8 +265,8 @@ class _BubbleFieldState extends State<BubbleField>
                     }
                   },
                 ),
-            // Only claims drags that start ON a bubble, so swiping on empty
-            // space still changes page (chats <-> map).
+            // Only claims drags that start ON a bubble. A short move
+            // accepts the drag so the page swipe cannot take it.
             _BubblePanRecognizer:
                 GestureRecognizerFactoryWithHandlers<_BubblePanRecognizer>(
                   () => _BubblePanRecognizer(
@@ -274,6 +274,7 @@ class _BubbleFieldState extends State<BubbleField>
                     debugOwner: this,
                   ),
                   (r) => r
+                    ..dragStartBehavior = DragStartBehavior.down
                     ..onStart = _onPanStart
                     ..onUpdate = _onPanUpdate
                     ..onEnd = _onPanEnd
@@ -466,8 +467,28 @@ class _BubbleFieldState extends State<BubbleField>
 class _BubblePanRecognizer extends PanGestureRecognizer {
   _BubblePanRecognizer({required this.isOnBubble, super.debugOwner});
   final bool Function(Offset localPosition) isOnBubble;
+  Offset? _down;
 
   @override
   bool isPointerAllowed(PointerEvent event) =>
       isOnBubble(event.localPosition) && super.isPointerAllowed(event);
+
+  @override
+  void addAllowedPointer(PointerDownEvent event) {
+    _down = event.localPosition;
+    super.addAllowedPointer(event);
+  }
+
+  @override
+  void handleEvent(PointerEvent event) {
+    final down = _down;
+    if (event is PointerMoveEvent &&
+        down != null &&
+        (event.localPosition - down).distance > 8) {
+      // Claim the pointer before the page view's horizontal drag does.
+      // A still finger still reaches tap and long-press.
+      resolve(GestureDisposition.accepted);
+    }
+    super.handleEvent(event);
+  }
 }

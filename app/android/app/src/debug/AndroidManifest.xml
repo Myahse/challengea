@@ -4,4 +4,6 @@
          to allow setting breakpoints, to provide hot reload, etc.
     -->
     <uses-permission android:name="android.permission.INTERNET"/>
+    <!-- Dev API is plain HTTP on the computer (or adb reverse to 127.0.0.1). -->
+    <application android:usesCleartextTraffic="true"/>
 </manifest>

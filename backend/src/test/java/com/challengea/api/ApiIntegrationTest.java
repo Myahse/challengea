@@ -27,7 +27,7 @@ import org.springframework.web.socket.client.standard.StandardWebSocketClient;
 import org.springframework.web.socket.messaging.WebSocketStompClient;
 
 /** End-to-end: HTTP + WebSocket against a real Oracle 23ai. */
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = "mock.enabled=false")
 @Import(TestDatabase.class)
 @SuppressWarnings("unchecked")
 class ApiIntegrationTest {

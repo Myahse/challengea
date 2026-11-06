@@ -12,6 +12,7 @@ import '../widgets/bubble_field.dart';
 import '../widgets/friends_sheet.dart';
 import '../widgets/motion.dart';
 import 'chat_screen.dart';
+import 'profile_screen.dart';
 
 /// Figma: "Chat page" (node 28:144).
 class ChatHome extends StatefulWidget {
@@ -317,6 +318,8 @@ class _ChatHomeState extends State<ChatHome> {
                 child: _Header(
                   me: store.me,
                   requests: store.online?.incoming.length ?? 0,
+                  onProfile: () =>
+                      ProfileScreen.open(context, store, store.feed.me),
                   onFriends: store.online == null
                       ? null
                       : () => showFriendsSheet(context, store.online!),
@@ -362,7 +365,12 @@ class _ChatHomeState extends State<ChatHome> {
                   children: [
                     Positioned.fill(
                       child: Padding(
-                        padding: const EdgeInsets.fromLTRB(8, 8, 8, 40),
+                        padding: EdgeInsets.fromLTRB(
+                          8,
+                          8,
+                          8,
+                          MediaQuery.paddingOf(context).bottom + 96,
+                        ),
                         child: BubbleField(
                           store: store,
                           onOpen: _open,
@@ -381,7 +389,7 @@ class _ChatHomeState extends State<ChatHome> {
                       ),
                     Positioned(
                       right: 20,
-                      bottom: 40,
+                      bottom: MediaQuery.paddingOf(context).bottom + 96,
                       child: _SpeedDial(
                         onMap: widget.onOpenMap,
                         onAddFriend: () {
@@ -413,9 +421,15 @@ class _ChatHomeState extends State<ChatHome> {
 }
 
 class _Header extends StatelessWidget {
-  const _Header({required this.me, this.requests = 0, this.onFriends});
+  const _Header({
+    required this.me,
+    this.requests = 0,
+    this.onProfile,
+    this.onFriends,
+  });
   final Person me;
   final int requests;
+  final VoidCallback? onProfile;
   final VoidCallback? onFriends;
 
   @override
@@ -424,41 +438,49 @@ class _Header extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(16, 12, 20, 0),
       child: Row(
         children: [
-          Container(
-            padding: const EdgeInsets.all(3),
-            decoration: const BoxDecoration(
-              shape: BoxShape.circle,
-              color: AppColors.bubble,
+          GestureDetector(
+            onTap: onProfile,
+            behavior: HitTestBehavior.opaque,
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(3),
+                  decoration: const BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: AppColors.bubble,
+                  ),
+                  child: PersonAvatar(me, diameter: 42),
+                ),
+                const SizedBox(width: 8),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(me.name, style: tx(16, weight: FontWeight.w700)),
+                    Row(
+                      children: [
+                        Container(
+                          width: 6,
+                          height: 6,
+                          decoration: const BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: AppColors.online,
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          'Online',
+                          style: tx(
+                            12,
+                            weight: FontWeight.w500,
+                            color: AppColors.muted,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ],
             ),
-            child: PersonAvatar(me, diameter: 42),
-          ),
-          const SizedBox(width: 8),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(me.name, style: tx(16, weight: FontWeight.w700)),
-              Row(
-                children: [
-                  Container(
-                    width: 6,
-                    height: 6,
-                    decoration: const BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: AppColors.online,
-                    ),
-                  ),
-                  const SizedBox(width: 4),
-                  Text(
-                    'Online',
-                    style: tx(
-                      12,
-                      weight: FontWeight.w500,
-                      color: AppColors.muted,
-                    ),
-                  ),
-                ],
-              ),
-            ],
           ),
           const Spacer(),
           if (onFriends != null) ...[

@@ -46,3 +46,8 @@ app:
     ttl: 5m
     # Dev only: return the SMS code in the API response (no SMS provider yet).
     dev-echo: ${OTP_DEV_ECHO:true}
+
+# Seeds a Marcory cast (friends, chats, map pins) the first time the API starts.
+# Sign in as moise@challengea.dev / challengea. Set MOCK_DATA=false to skip.
+mock:
+  enabled: ${MOCK_DATA:true}

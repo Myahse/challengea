@@ -38,10 +38,32 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
+  final _scroll = ScrollController();
+  final _gridKey = GlobalKey();
   int _tab = 0;
+
+  @override
+  void dispose() {
+    _scroll.dispose();
+    super.dispose();
+  }
 
   Creator get c => widget.creator;
   FeedData get feed => widget.store.feed;
+
+  void _selectTab(int i) {
+    setState(() => _tab = i);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final target = _gridKey.currentContext;
+      if (target == null || !target.mounted) return;
+      Scrollable.ensureVisible(
+        target,
+        alignment: 0.05,
+        duration: const Duration(milliseconds: 380),
+        curve: Curves.easeOutCubic,
+      );
+    });
+  }
 
   List<Post> get _shown => switch (_tab) {
     1 => c.posts.where((p) => p.kind == PostKind.video).toList(),
@@ -168,6 +190,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           return Stack(
             children: [
               CustomScrollView(
+                controller: _scroll,
                 slivers: [
                   SliverToBoxAdapter(child: _header()),
                   SliverPersistentHeader(
@@ -177,11 +200,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       top: top,
                       tabs: _tabLabels(),
                       selected: _tab,
-                      onSelect: (i) => setState(() => _tab = i),
+                      onSelect: _selectTab,
                     ),
                   ),
+                  SliverToBoxAdapter(child: SizedBox(key: _gridKey, height: 1)),
                   SliverPadding(
-                    padding: const EdgeInsets.fromLTRB(24, 12, 24, 60),
+                    padding: EdgeInsets.fromLTRB(
+                      24,
+                      12,
+                      24,
+                      MediaQuery.paddingOf(context).bottom + 110,
+                    ),
                     sliver: shown.isEmpty
                         ? SliverToBoxAdapter(
                             child: Padding(

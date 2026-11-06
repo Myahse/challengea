@@ -83,7 +83,9 @@ class _VideoFeedState extends State<VideoFeed> {
               store: widget.store,
               post: widget.posts[i],
               playing: widget.active && i == _index,
-              bottomInset: widget.pushed ? 12 : 34,
+              bottomInset: widget.pushed
+                  ? 16
+                  : MediaQuery.paddingOf(context).bottom + 96,
             ),
           ),
           // Header: Live badge or back button, title, search.
