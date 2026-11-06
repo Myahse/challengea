@@ -4,6 +4,7 @@ import '../chat_store.dart';
 import '../models.dart';
 import '../theme.dart';
 import 'avatar.dart';
+import 'motion.dart';
 
 /// A friend on the map (rounded square photo + name), used by both maps.
 class FriendPin extends StatelessWidget {
@@ -22,75 +23,84 @@ class FriendPin extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = spot.person;
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedScale(
-        scale: selected ? 1.2 : 1,
-        duration: const Duration(milliseconds: 200),
-        alignment: Alignment.bottomCenter,
-        child: Opacity(
-          opacity: spot.online ? 1 : .55,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: size,
-                height: size,
-                padding: const EdgeInsets.all(3),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(16),
-                  border: selected
-                      ? Border.all(color: AppColors.ink, width: 2)
-                      : null,
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: .18),
-                      blurRadius: 10,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(13),
-                  child: Container(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [
-                          Color.lerp(p.color, Colors.white, .45)!,
-                          p.color,
-                        ],
+    // Drops onto the map with a little bounce the first time it appears.
+    return FadeSlideIn(
+      offset: const Offset(0, -30),
+      scale: .5,
+      duration: const Duration(milliseconds: 600),
+      child: Pressable(
+        onTap: onTap,
+        child: AnimatedScale(
+          scale: selected ? 1.2 : 1,
+          duration: const Duration(milliseconds: 200),
+          alignment: Alignment.bottomCenter,
+          child: Opacity(
+            opacity: spot.online ? 1 : .55,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: size,
+                  height: size,
+                  padding: const EdgeInsets.all(3),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(16),
+                    border: selected
+                        ? Border.all(color: AppColors.ink, width: 2)
+                        : null,
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: .18),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
                       ),
-                    ),
-                    alignment: Alignment.center,
-                    child: Text(
-                      p.initials,
-                      style: tx(
-                        26,
-                        weight: FontWeight.w800,
-                        color: Colors.white,
+                    ],
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(13),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [
+                            Color.lerp(p.color, Colors.white, .45)!,
+                            p.color,
+                          ],
+                        ),
+                      ),
+                      alignment: Alignment.center,
+                      child: Text(
+                        p.initials,
+                        style: tx(
+                          26,
+                          weight: FontWeight.w800,
+                          color: Colors.white,
+                        ),
                       ),
                     ),
                   ),
                 ),
-              ),
-              const SizedBox(height: 3),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(8),
+                const SizedBox(height: 3),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 7,
+                    vertical: 2,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    spot.online
+                        ? p.firstName
+                        : '${p.firstName} · ${spot.updated}',
+                    style: tx(11, weight: FontWeight.w700),
+                  ),
                 ),
-                child: Text(
-                  spot.online
-                      ? p.firstName
-                      : '${p.firstName} · ${spot.updated}',
-                  style: tx(11, weight: FontWeight.w700),
-                ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),

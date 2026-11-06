@@ -10,6 +10,7 @@ import '../theme.dart';
 import '../widgets/avatar.dart';
 import '../widgets/bubble_field.dart';
 import '../widgets/friends_sheet.dart';
+import '../widgets/motion.dart';
 import 'chat_screen.dart';
 
 /// Figma: "Chat page" (node 28:144).
@@ -307,80 +308,104 @@ class _ChatHomeState extends State<ChatHome> {
     return Scaffold(
       body: SafeArea(
         bottom: false,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            _Header(
-              me: store.me,
-              requests: store.online?.incoming.length ?? 0,
-              onFriends: store.online == null
-                  ? null
-                  : () => showFriendsSheet(context, store.online!),
-            ),
-            const SizedBox(height: 14),
-            _TalesRow(
-              onPlay: (g) => challengeWithGame(context, store, g),
-              onExplore: _explore,
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(18, 22, 18, 0),
-              child: Row(
-                children: [
-                  const Icon(Icons.chat_bubble_rounded, size: 26),
-                  const SizedBox(width: 6),
-                  Text('Chats', style: tx(17, weight: FontWeight.w700)),
-                  const Spacer(),
-                  const Icon(Icons.more_horiz, size: 26),
-                ],
+        child: ListenableBuilder(
+          listenable: store,
+          builder: (context, _) => Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              FadeSlideIn(
+                child: _Header(
+                  me: store.me,
+                  requests: store.online?.incoming.length ?? 0,
+                  onFriends: store.online == null
+                      ? null
+                      : () => showFriendsSheet(context, store.online!),
+                ),
               ),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(18, 4, 18, 0),
-              child: Text(
-                'Drag a bubble onto another to make a group',
-                style: tx(12, color: AppColors.muted),
+              const SizedBox(height: 14),
+              FadeSlideIn(
+                delay: const Duration(milliseconds: 80),
+                child: _TalesRow(
+                  onPlay: (g) => challengeWithGame(context, store, g),
+                  onExplore: _explore,
+                ),
               ),
-            ),
-            Expanded(
-              child: Stack(
-                children: [
-                  Positioned.fill(
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(8, 8, 8, 40),
-                      child: BubbleField(
-                        store: store,
-                        onOpen: _open,
-                        onLongPress: _longPress,
-                        onMerged: _onMerged,
+              FadeSlideIn(
+                delay: const Duration(milliseconds: 160),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(18, 22, 18, 0),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.chat_bubble_rounded, size: 26),
+                          const SizedBox(width: 6),
+                          Text('Chats', style: tx(17, weight: FontWeight.w700)),
+                          const Spacer(),
+                          const Icon(Icons.more_horiz, size: 26),
+                        ],
                       ),
                     ),
-                  ),
-                  Positioned(
-                    right: 20,
-                    bottom: 40,
-                    child: _SpeedDial(
-                      onMap: widget.onOpenMap,
-                      onAddFriend: () {
-                        if (store.online != null) {
-                          showFriendsSheet(context, store.online!);
-                        } else if (store.addFriend() == null) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(
-                                'No more demo friends',
-                                style: tx(14, color: Colors.white),
-                              ),
-                            ),
-                          );
-                        }
-                      },
-                      onNewGroup: _newGroup,
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(18, 4, 18, 0),
+                      child: Text(
+                        'Drag a bubble onto another to make a group',
+                        style: tx(12, color: AppColors.muted),
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
-          ],
+              Expanded(
+                child: Stack(
+                  children: [
+                    Positioned.fill(
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(8, 8, 8, 40),
+                        child: BubbleField(
+                          store: store,
+                          onOpen: _open,
+                          onLongPress: _longPress,
+                          onMerged: _onMerged,
+                        ),
+                      ),
+                    ),
+                    // Above the bubble area so its button receives taps.
+                    if (store.isOnline && store.nodes.isEmpty)
+                      Positioned.fill(
+                        child: _EmptyFriends(
+                          onFind: () =>
+                              showFriendsSheet(context, store.online!),
+                        ),
+                      ),
+                    Positioned(
+                      right: 20,
+                      bottom: 40,
+                      child: _SpeedDial(
+                        onMap: widget.onOpenMap,
+                        onAddFriend: () {
+                          if (store.online != null) {
+                            showFriendsSheet(context, store.online!);
+                          } else if (store.addFriend() == null) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  'No more demo friends',
+                                  style: tx(14, color: Colors.white),
+                                ),
+                              ),
+                            );
+                          }
+                        },
+                        onNewGroup: _newGroup,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -516,55 +541,64 @@ class _TalesRow extends StatelessWidget {
                 );
               }
               final g = allGames[i];
-              return GestureDetector(
-                onTap: () => onPlay(g),
-                child: Column(
-                  children: [
-                    Container(
-                      width: 88,
-                      height: 88,
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(18),
-                        gradient: LinearGradient(
-                          colors: g.colors,
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                        ),
-                      ),
-                      child: Stack(
-                        children: [
-                          Center(
-                            child: Icon(g.icon, size: 44, color: Colors.white),
+              return FadeSlideIn(
+                delay: Duration(milliseconds: 160 + i * 70),
+                offset: const Offset(40, 0),
+                scale: .85,
+                child: Pressable(
+                  onTap: () => onPlay(g),
+                  child: Column(
+                    children: [
+                      Container(
+                        width: 88,
+                        height: 88,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(18),
+                          gradient: LinearGradient(
+                            colors: g.colors,
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
                           ),
-                          if (!g.playable)
-                            Positioned(
-                              right: 6,
-                              top: 6,
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 5,
-                                  vertical: 1,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: Colors.black38,
-                                  borderRadius: BorderRadius.circular(6),
-                                ),
-                                child: Text(
-                                  'soon',
-                                  style: tx(
-                                    9,
-                                    weight: FontWeight.w700,
-                                    color: Colors.white,
+                        ),
+                        child: Stack(
+                          children: [
+                            Center(
+                              child: Icon(
+                                g.icon,
+                                size: 44,
+                                color: Colors.white,
+                              ),
+                            ),
+                            if (!g.playable)
+                              Positioned(
+                                right: 6,
+                                top: 6,
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 5,
+                                    vertical: 1,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: Colors.black38,
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: Text(
+                                    'soon',
+                                    style: tx(
+                                      9,
+                                      weight: FontWeight.w700,
+                                      color: Colors.white,
+                                    ),
                                   ),
                                 ),
                               ),
-                            ),
-                        ],
+                          ],
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(g.name, style: tx(10, weight: FontWeight.w500)),
-                  ],
+                      const SizedBox(height: 4),
+                      Text(g.name, style: tx(10, weight: FontWeight.w500)),
+                    ],
+                  ),
                 ),
               );
             },
@@ -686,6 +720,112 @@ class _SpeedDialState extends State<_SpeedDial>
             ],
           );
         },
+      ),
+    );
+  }
+}
+
+/// New account with no friends yet: floating bubbles and a clear next step.
+class _EmptyFriends extends StatefulWidget {
+  const _EmptyFriends({required this.onFind});
+  final VoidCallback onFind;
+
+  @override
+  State<_EmptyFriends> createState() => _EmptyFriendsState();
+}
+
+class _EmptyFriendsState extends State<_EmptyFriends>
+    with SingleTickerProviderStateMixin {
+  late final _float = AnimationController(
+    vsync: this,
+    duration: const Duration(seconds: 4),
+  )..repeat();
+
+  @override
+  void dispose() {
+    _float.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    const colors = [
+      Color(0xFFF06BA8),
+      Color(0xFF4FB3F6),
+      Color(0xFF5CC98A),
+      Color(0xFFFFC53D),
+    ];
+    return FadeSlideIn(
+      delay: const Duration(milliseconds: 250),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          SizedBox(
+            width: 220,
+            height: 140,
+            child: AnimatedBuilder(
+              animation: _float,
+              builder: (context, _) => Stack(
+                children: [
+                  for (var i = 0; i < 4; i++)
+                    Positioned(
+                      left: 20.0 + i * 46,
+                      top: 40 + 18 * sin(_float.value * 2 * pi + i * 1.4),
+                      child: Container(
+                        width: 52.0 - (i.isOdd ? 12 : 0),
+                        height: 52.0 - (i.isOdd ? 12 : 0),
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          gradient: RadialGradient(
+                            colors: [
+                              colors[i].withValues(alpha: .9),
+                              colors[i].withValues(alpha: .45),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+          Text(
+            'Your bubbles live here',
+            style: tx(20, weight: FontWeight.w800),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'Add friends: each one becomes a bubble you can\nchat with, merge into groups and challenge.',
+            textAlign: TextAlign.center,
+            style: tx(14, color: AppColors.muted),
+          ),
+          const SizedBox(height: 18),
+          Pressable(
+            onTap: widget.onFind,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 26, vertical: 14),
+              decoration: BoxDecoration(
+                color: AppColors.ink,
+                borderRadius: BorderRadius.circular(30),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(
+                    Icons.person_search_rounded,
+                    color: Colors.white,
+                    size: 20,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Find your friends',
+                    style: tx(15, weight: FontWeight.w700, color: Colors.white),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

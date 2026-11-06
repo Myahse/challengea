@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'widgets/motion.dart';
+
 /// Design tokens taken from the Figma "Chat page" frames (430 x 932).
 /// Keep every color / text style here so final Figma values are a one-file swap.
 class AppColors {
@@ -40,6 +42,16 @@ ThemeData buildTheme() {
     colorScheme: ColorScheme.fromSeed(
       seedColor: AppColors.accent,
       surface: Colors.white,
+    ),
+    pageTransitionsTheme: const PageTransitionsTheme(
+      builders: {
+        TargetPlatform.android: SmoothPageTransitions(),
+        TargetPlatform.iOS: SmoothPageTransitions(),
+        TargetPlatform.linux: SmoothPageTransitions(),
+        TargetPlatform.macOS: SmoothPageTransitions(),
+        TargetPlatform.windows: SmoothPageTransitions(),
+        TargetPlatform.fuchsia: SmoothPageTransitions(),
+      },
     ),
     snackBarTheme: const SnackBarThemeData(behavior: SnackBarBehavior.floating),
   );

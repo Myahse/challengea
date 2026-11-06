@@ -4,6 +4,7 @@ import '../chat_store.dart';
 import '../models.dart';
 import '../theme.dart';
 import '../widgets/avatar.dart';
+import '../widgets/motion.dart';
 import '../games/challenge.dart';
 import 'call_screen.dart';
 import 'profile_screen.dart';
@@ -286,7 +287,21 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
+  /// New messages land with a little bounce; older ones appear instantly.
   Widget _bubble(Message m) {
+    final fresh = DateTime.now().difference(m.time).inSeconds < 4;
+    final child = _bubbleContent(m);
+    if (!fresh) return child;
+    return FadeSlideIn(
+      key: ObjectKey(m),
+      duration: const Duration(milliseconds: 420),
+      offset: Offset(m.isMine ? 40 : -40, 12),
+      scale: .85,
+      child: child,
+    );
+  }
+
+  Widget _bubbleContent(Message m) {
     if (m.game != null) return _gameCard(m);
     final mine = m.isMine;
     return Align(
@@ -376,25 +391,50 @@ class _ChatScreenState extends State<ChatScreen> {
                 ),
               ),
             ),
-            if (hasText)
-              IconButton(
-                onPressed: _send,
-                icon: const Icon(Icons.send_rounded, color: AppColors.accent),
-              )
-            else ...[
-              IconButton(
-                onPressed: () => _soon('Files'),
-                icon: const Icon(Icons.attach_file),
+            // The tools morph into a send button as soon as you type.
+            AnimatedSwitcher(
+              duration: Motion.normal,
+              transitionBuilder: (child, a) => ScaleTransition(
+                scale: CurvedAnimation(parent: a, curve: Curves.easeOutBack),
+                child: FadeTransition(opacity: a, child: child),
               ),
-              IconButton(
-                onPressed: () => _soon('Camera'),
-                icon: const Icon(Icons.photo_camera_outlined),
-              ),
-              IconButton(
-                onPressed: () => _soon('Voice note'),
-                icon: const Icon(Icons.mic_none_rounded),
-              ),
-            ],
+              child: hasText
+                  ? Pressable(
+                      key: const ValueKey('send'),
+                      onTap: _send,
+                      child: Container(
+                        width: 42,
+                        height: 42,
+                        margin: const EdgeInsets.only(right: 2),
+                        decoration: const BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: AppColors.accent,
+                        ),
+                        child: const Icon(
+                          Icons.arrow_upward_rounded,
+                          color: Colors.white,
+                        ),
+                      ),
+                    )
+                  : Row(
+                      key: const ValueKey('tools'),
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        IconButton(
+                          onPressed: () => _soon('Files'),
+                          icon: const Icon(Icons.attach_file),
+                        ),
+                        IconButton(
+                          onPressed: () => _soon('Camera'),
+                          icon: const Icon(Icons.photo_camera_outlined),
+                        ),
+                        IconButton(
+                          onPressed: () => _soon('Voice note'),
+                          icon: const Icon(Icons.mic_none_rounded),
+                        ),
+                      ],
+                    ),
+            ),
           ],
         ),
       ),

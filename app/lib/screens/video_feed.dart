@@ -9,6 +9,7 @@ import '../theme.dart';
 import '../widgets/avatar.dart';
 import '../widgets/comments_sheet.dart';
 import '../widgets/fake_video.dart';
+import '../widgets/motion.dart';
 import '../widgets/product_sheet.dart';
 import 'profile_screen.dart';
 
@@ -349,19 +350,42 @@ class _VideoPageState extends State<_VideoPage> with TickerProviderStateMixin {
         child: Semantics(
           button: true,
           label: label,
-          child: GestureDetector(
+          child: Pressable(
             onTap: onTap,
+            scale: .8,
             child: Column(
               children: [
-                Icon(
-                  icon,
-                  color: color,
-                  size: 38,
-                  shadows: const [Shadow(color: Colors.black38, blurRadius: 8)],
+                // Icon swaps (liked / saved) with an elastic pop.
+                AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 450),
+                  transitionBuilder: (child, a) => ScaleTransition(
+                    scale: CurvedAnimation(parent: a, curve: Curves.elasticOut),
+                    child: child,
+                  ),
+                  child: Icon(
+                    icon,
+                    key: ValueKey('$icon$color'),
+                    color: color,
+                    size: 38,
+                    shadows: const [
+                      Shadow(color: Colors.black38, blurRadius: 8),
+                    ],
+                  ),
                 ),
-                Text(
-                  count,
-                  style: tx(12, weight: FontWeight.w600, color: Colors.white),
+                AnimatedSwitcher(
+                  duration: Motion.fast,
+                  transitionBuilder: (child, a) => SlideTransition(
+                    position: Tween(
+                      begin: const Offset(0, .5),
+                      end: Offset.zero,
+                    ).animate(a),
+                    child: FadeTransition(opacity: a, child: child),
+                  ),
+                  child: Text(
+                    count,
+                    key: ValueKey(count),
+                    style: tx(12, weight: FontWeight.w600, color: Colors.white),
+                  ),
                 ),
               ],
             ),

@@ -4,6 +4,7 @@ import '../chat_store.dart';
 import '../feed.dart';
 import '../theme.dart';
 import '../widgets/fake_video.dart';
+import '../widgets/motion.dart';
 import 'chat_screen.dart';
 import 'video_feed.dart';
 
@@ -201,14 +202,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                   childAspectRatio: 114 / 88,
                                 ),
                             itemCount: shown.length,
-                            itemBuilder: (context, i) => GestureDetector(
-                              onTap: () => VideoFeed.open(
-                                context,
-                                widget.store,
-                                shown,
-                                i,
+                            // Tiles pop in one after another (first rows only).
+                            itemBuilder: (context, i) => FadeSlideIn(
+                              key: ValueKey('$_tab-$i'),
+                              delay: Duration(
+                                milliseconds: 40 * (i < 15 ? i : 15),
                               ),
-                              child: PostThumb(post: shown[i]),
+                              scale: .9,
+                              child: Pressable(
+                                onTap: () => VideoFeed.open(
+                                  context,
+                                  widget.store,
+                                  shown,
+                                  i,
+                                ),
+                                child: PostThumb(post: shown[i]),
+                              ),
                             ),
                           ),
                   ),
@@ -325,11 +334,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
               const SizedBox(height: 46),
               Row(
                 children: [
-                  _stat(compact(c.followers), 'Followers'),
+                  _stat(c.followers, 'Followers'),
                   const SizedBox(width: 14),
-                  _stat(compact(c.following), 'Following'),
+                  _stat(c.following, 'Following'),
                   const SizedBox(width: 14),
-                  _stat(compact(c.likes), 'Likes'),
+                  _stat(c.likes, 'Likes'),
                 ],
               ),
               const SizedBox(height: 12),
@@ -370,7 +379,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Widget _stat(String value, String label) => Expanded(
+  Widget _stat(int value, String label) => Expanded(
     child: Container(
       height: 88,
       decoration: BoxDecoration(
@@ -380,7 +389,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Text(value, style: tx(22, weight: FontWeight.w800)),
+          CountUp(
+            value: value,
+            format: compact,
+            style: tx(22, weight: FontWeight.w800),
+          ),
           Text(label, style: tx(12, color: const Color(0xFF555555))),
         ],
       ),

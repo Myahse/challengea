@@ -436,7 +436,8 @@ class _SudokuDuelScreenState extends State<SudokuDuelScreen> {
     const thick = BorderSide(color: AppColors.ink, width: 1.6);
     return GestureDetector(
       onTap: () => setState(() => _selected = i),
-      child: Container(
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 160),
         decoration: BoxDecoration(
           color: selected
               ? const Color(0xFFBDE7C6)
@@ -451,23 +452,32 @@ class _SudokuDuelScreenState extends State<SudokuDuelScreen> {
           ),
         ),
         alignment: Alignment.center,
-        child: v == 0
-            ? null
-            : FittedBox(
-                child: Padding(
-                  padding: const EdgeInsets.all(2),
-                  child: Text(
-                    '$v',
-                    style: tx(
-                      22,
-                      weight: given ? FontWeight.w700 : FontWeight.w500,
-                      color: wrong
-                          ? const Color(0xFFE5484D)
-                          : (given ? AppColors.ink : const Color(0xFF1F6FEB)),
+        // Digits pop in; a wrong one shakes in red.
+        child: AnimatedSwitcher(
+          duration: const Duration(milliseconds: 320),
+          transitionBuilder: (child, a) => ScaleTransition(
+            scale: CurvedAnimation(parent: a, curve: Curves.easeOutBack),
+            child: child,
+          ),
+          child: v == 0
+              ? const SizedBox.shrink(key: ValueKey(0))
+              : FittedBox(
+                  key: ValueKey('$v$wrong'),
+                  child: Padding(
+                    padding: const EdgeInsets.all(2),
+                    child: Text(
+                      '$v',
+                      style: tx(
+                        22,
+                        weight: given ? FontWeight.w700 : FontWeight.w500,
+                        color: wrong
+                            ? const Color(0xFFE5484D)
+                            : (given ? AppColors.ink : const Color(0xFF1F6FEB)),
+                      ),
                     ),
                   ),
                 ),
-              ),
+        ),
       ),
     );
   }
