@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:math' as math;
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:latlong2/latlong.dart';
@@ -168,8 +169,27 @@ class OnlineSync {
       body =
           'You sent a ${gameById(gameId).name} challenge'; // the server text is written for the friend
     }
+    final url = m['mediaUrl'] as String?;
+    final kind = switch (type) {
+      'image' => MessageKind.image,
+      'voice' => MessageKind.voice,
+      'sticker' => MessageKind.sticker,
+      _ => MessageKind.text,
+    };
     return Message(
-      body,
+      kind == MessageKind.image
+          ? '📷 Photo'
+          : (kind == MessageKind.voice ? '🎤 Voice note' : body),
+      kind: kind,
+      mediaUrl: url == null
+          ? null
+          : (url.startsWith('http') ? url : '${api.baseUrl}$url'),
+      duration: meta?['durationMs'] is num
+          ? Duration(milliseconds: (meta!['durationMs'] as num).toInt())
+          : null,
+      waveform: (meta?['waveform'] as List?)
+          ?.map((v) => (v as num).toDouble())
+          .toList(),
       isChallenge: isChallenge,
       sender: senderId == myId
           ? null
@@ -412,6 +432,62 @@ class OnlineSync {
     }
   }
 
+  /// Photo / voice note / sticker: shows it at once, uploads, then sends.
+  Future<void> sendMedia(
+    BubbleNode n,
+    Message local, {
+    Uint8List? bytes,
+    String? contentType,
+  }) async {
+    n.messages.add(local);
+    store.notifyChanged();
+    try {
+      await _ready(n);
+      String? url;
+      if (bytes != null) {
+        final kind = local.kind == MessageKind.image ? 'image' : 'voice';
+        final ext = (contentType ?? '').split('/').last.split(';').first;
+        final up = await api.upload(
+          '/media',
+          bytes,
+          filename: '$kind.$ext',
+          contentType: contentType ?? 'application/octet-stream',
+          fields: {'kind': kind},
+        );
+        url = (up as Map)['url'] as String;
+      }
+      final dto = await api.post('/conversations/${n.serverId}/messages', {
+        'type': local.kind.name,
+        if (local.kind == MessageKind.sticker) 'body': local.text,
+        'mediaUrl': ?url,
+        'metadata': {
+          if (local.duration != null)
+            'durationMs': local.duration!.inMilliseconds,
+          if (local.waveform != null)
+            'waveform': [
+              for (final v in local.waveform!)
+                double.parse(v.toStringAsFixed(2)),
+            ],
+        },
+      });
+      final server = local.withServer(messageFrom(dto as Map<String, dynamic>));
+      final i = n.messages.indexOf(local);
+      if (n.messages.any((x) => x.serverId == server.serverId)) {
+        n.messages.remove(local);
+        final j = n.messages.indexWhere((x) => x.serverId == server.serverId);
+        n.messages[j] =
+            server; // keep the local file on the copy from the live event
+      } else if (i >= 0) {
+        n.messages[i] = server;
+      }
+      store.notifyChanged();
+    } on ApiError catch (e) {
+      n.messages.remove(local);
+      store.notifyChanged();
+      onNotice?.call('Not sent: ${e.message}');
+    }
+  }
+
   void markRead(BubbleNode n) {
     final last = n.messages.where((m) => m.serverId != null).lastOrNull;
     if (n.serverId == null || last == null) return;
@@ -622,11 +698,14 @@ class OnlineSync {
     // My own message sent from this phone: replace the local copy.
     final local = m.isMine
         ? node.messages
-              .where((x) => x.serverId == null && x.text == m.text)
+              .where(
+                (x) =>
+                    x.serverId == null && x.kind == m.kind && x.text == m.text,
+              )
               .firstOrNull
         : null;
     if (local != null) {
-      node.messages[node.messages.indexOf(local)] = m;
+      node.messages[node.messages.indexOf(local)] = local.withServer(m);
     } else {
       node.messages.add(m);
       if (!m.isMine) {

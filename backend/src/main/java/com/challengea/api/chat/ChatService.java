@@ -31,9 +31,12 @@ public class ChatService {
   private final UserRepository users;
   private final FriendService friends;
   private final Events events;
+  private final com.challengea.api.media.MediaService media;
 
   public ChatService(ConversationRepository conversations, MemberRepository members, MessageRepository messages,
-      BubbleRepository bubbles, UserRepository users, FriendService friends, Events events) {
+      BubbleRepository bubbles, UserRepository users, FriendService friends, Events events,
+      com.challengea.api.media.MediaService media) {
+    this.media = media;
     this.conversations = conversations;
     this.members = members;
     this.messages = messages;
@@ -149,8 +152,13 @@ public class ChatService {
     requireMember(me, conversationId);
     if (!USER_TYPES.contains(type)) throw ApiException.badRequest("invalid_type", "Unknown message type " + type);
     if (type.equals("text") && (body == null || body.isBlank())) throw ApiException.badRequest("empty", "Message is empty");
-    if (!type.equals("text") && !type.equals("sticker") && mediaUrl == null) {
-      throw ApiException.badRequest("media_required", "This message needs a file");
+    if (type.equals("sticker") && (body == null || body.isBlank())) throw ApiException.badRequest("empty", "Pick a sticker");
+    if (type.equals("image") || type.equals("voice")) {
+      media.requireOwned(me, mediaUrl, type); // only files you uploaded
+    } else if (type.equals("file")) {
+      throw ApiException.badRequest("invalid_type", "Files are not supported yet");
+    } else if (mediaUrl != null) {
+      throw ApiException.badRequest("invalid_media", "This message type has no file");
     }
     var m = messages.save(new ChatMessage(conversationId, me, type, body, mediaUrl, metadata));
     var dto = MessageDto.of(m);

@@ -1,4 +1,5 @@
 import 'dart:math';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 
@@ -471,6 +472,21 @@ class ChatStore extends ChangeNotifier {
       );
       notifyListeners();
     });
+  }
+
+  /// Photo, voice note or sticker. Demo: stays on the phone. Online: uploaded.
+  void sendMedia(
+    BubbleNode node,
+    Message local, {
+    Uint8List? bytes,
+    String? contentType,
+  }) {
+    if (online != null) {
+      online!.sendMedia(node, local, bytes: bytes, contentType: contentType);
+      return;
+    }
+    node.messages.add(local);
+    notifyListeners();
   }
 
   /// Adds a message to a chat (game results, replies).

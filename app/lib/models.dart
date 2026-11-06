@@ -1,4 +1,5 @@
 import 'dart:math';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 
@@ -16,6 +17,8 @@ class Person {
   String get firstName => name.split(' ').first;
 }
 
+enum MessageKind { text, image, voice, sticker }
+
 class Message {
   Message(
     this.text, {
@@ -24,7 +27,43 @@ class Message {
     this.game,
     this.serverId,
     this.isChallenge = false,
+    this.kind = MessageKind.text,
+    this.mediaUrl,
+    this.localPath,
+    this.localBytes,
+    this.duration,
+    this.waveform,
   }) : time = time ?? DateTime.now();
+
+  final MessageKind kind;
+
+  /// Photo / voice note on the server (absolute URL).
+  final String? mediaUrl;
+
+  /// Just recorded or picked on this phone (shown before / without upload).
+  final String? localPath;
+  final Uint8List? localBytes;
+
+  /// Voice notes: length and loudness bars (0..1).
+  final Duration? duration;
+  final List<double>? waveform;
+
+  /// Same message with the server's id and URL, keeping the local file so
+  /// the photo doesn't flicker when the upload finishes.
+  Message withServer(Message server) => Message(
+    server.text,
+    sender: server.sender,
+    time: server.time,
+    game: server.game,
+    serverId: server.serverId,
+    isChallenge: server.isChallenge,
+    kind: server.kind,
+    mediaUrl: server.mediaUrl,
+    localPath: localPath,
+    localBytes: localBytes,
+    duration: server.duration ?? duration,
+    waveform: server.waveform ?? waveform,
+  );
 
   /// A challenge invite (not a result): the card shows no Rematch button.
   final bool isChallenge;

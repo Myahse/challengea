@@ -179,6 +179,45 @@ class ApiIntegrationTest {
   }
 
   @Test
+  void photosAndVoiceNotesAreUploadedThenSentAndOnlyTheOwnerCanUseThem() {
+    var me = signUp("Me");
+    var friend = signUp("Friend");
+    befriend(me, friend);
+    var chat = post("/conversations/direct/" + friend.id(), null, me.token());
+
+    var png = new byte[] {(byte) 0x89, 'P', 'N', 'G', 13, 10, 26, 10, 0, 0, 0, 0};
+    var headers = new org.springframework.http.HttpHeaders();
+    headers.setContentType(org.springframework.http.MediaType.IMAGE_PNG);
+    var parts = new org.springframework.util.LinkedMultiValueMap<String, Object>();
+    parts.add("kind", "image");
+    parts.add("file", new org.springframework.http.HttpEntity<>(new org.springframework.core.io.ByteArrayResource(png) {
+      @Override
+      public String getFilename() { return "photo.png"; }
+    }, headers));
+    var uploaded = http.post().uri("/media").header("Authorization", "Bearer " + me.token())
+        .contentType(org.springframework.http.MediaType.MULTIPART_FORM_DATA).body(parts)
+        .retrieve().body(new ParameterizedTypeReference<Map<String, Object>>() {});
+    var url = (String) uploaded.get("url");
+    assertThat(url).startsWith("/api/media/");
+
+    // The file is served (no token needed: the URL itself is the secret).
+    var bytes = RestClient.create("http://localhost:" + port).get().uri(url).retrieve().body(byte[].class);
+    assertThat(bytes).isEqualTo(png);
+
+    var msg = post("/conversations/" + chat.get("id") + "/messages", Map.of("type", "image", "mediaUrl", url), me.token());
+    assertThat(msg.get("mediaUrl")).isEqualTo(url);
+
+    // Someone else can't send my file, and a voice note must point to a voice file.
+    assertThatThrownBy(() -> post("/conversations/" + chat.get("id") + "/messages", Map.of("type", "image", "mediaUrl", url), friend.token()))
+        .isInstanceOf(HttpClientErrorException.Forbidden.class);
+    assertThatThrownBy(() -> post("/conversations/" + chat.get("id") + "/messages", Map.of("type", "voice", "mediaUrl", url), me.token()))
+        .hasMessageContaining("invalid_media");
+    // Stickers need no file.
+    var sticker = post("/conversations/" + chat.get("id") + "/messages", Map.of("type", "sticker", "body", "🔥"), me.token());
+    assertThat(sticker.get("body")).isEqualTo("🔥");
+  }
+
+  @Test
   void ghostModeHidesMeFromTheMap() {
     var me = signUp("Me");
     var friend = signUp("Friend");

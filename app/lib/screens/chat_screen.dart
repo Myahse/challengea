@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../chat_store.dart';
 import '../models.dart';
 import '../theme.dart';
 import '../widgets/avatar.dart';
+import '../widgets/message_media.dart';
 import '../widgets/motion.dart';
+import '../widgets/voice_recorder.dart';
 import '../games/challenge.dart';
 import 'call_screen.dart';
 import 'profile_screen.dart';
@@ -22,6 +26,9 @@ class ChatScreen extends StatefulWidget {
 class _ChatScreenState extends State<ChatScreen> {
   final _input = TextEditingController();
   final _scroll = ScrollController();
+  final _recorder = VoiceRecorder();
+  bool _stickers = false;
+  bool _cancelling = false;
 
   BubbleNode get node => widget.node;
 
@@ -29,12 +36,14 @@ class _ChatScreenState extends State<ChatScreen> {
   void initState() {
     super.initState();
     _input.addListener(() => setState(() {}));
+    _recorder.addListener(() => setState(() {}));
     widget.store.openChat(node); // online: loads the history and marks it read
   }
 
   @override
   void dispose() {
     widget.store.closeChat(node);
+    _recorder.dispose();
     _input.dispose();
     _scroll.dispose();
     super.dispose();
@@ -45,19 +54,6 @@ class _ChatScreenState extends State<ChatScreen> {
     if (text.isEmpty) return;
     widget.store.send(node, text);
     _input.clear();
-  }
-
-  void _soon(String what) {
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(
-        SnackBar(
-          content: Text(
-            '$what: coming in the next step',
-            style: tx(14, color: Colors.white),
-          ),
-        ),
-      );
   }
 
   void _startCall({bool video = false}) {
@@ -303,6 +299,16 @@ class _ChatScreenState extends State<ChatScreen> {
 
   Widget _bubbleContent(Message m) {
     if (m.game != null) return _gameCard(m);
+    switch (m.kind) {
+      case MessageKind.image:
+        return ImageBubble(message: m, mine: m.isMine);
+      case MessageKind.voice:
+        return VoiceBubble(message: m, mine: m.isMine);
+      case MessageKind.sticker:
+        return StickerBubble(message: m, mine: m.isMine);
+      case MessageKind.text:
+        break;
+    }
     final mine = m.isMine;
     return Align(
       alignment: mine ? Alignment.centerRight : Alignment.centerLeft,
@@ -365,79 +371,236 @@ class _ChatScreenState extends State<ChatScreen> {
     final hasText = _input.text.trim().isNotEmpty;
     return SafeArea(
       top: false,
-      child: Container(
-        margin: const EdgeInsets.fromLTRB(8, 4, 8, 8),
-        padding: const EdgeInsets.symmetric(horizontal: 4),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(14),
-        ),
-        child: Row(
-          children: [
-            IconButton(
-              onPressed: () => _soon('Stickers'),
-              icon: const Icon(Icons.sticky_note_2_outlined),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            margin: const EdgeInsets.fromLTRB(8, 4, 8, 8),
+            padding: const EdgeInsets.symmetric(horizontal: 4),
+            height: 52,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(26),
             ),
-            Expanded(
-              child: TextField(
-                controller: _input,
-                textInputAction: TextInputAction.send,
-                onSubmitted: (_) => _send(),
-                style: tx(15),
-                decoration: InputDecoration(
-                  hintText: 'Message',
-                  hintStyle: tx(15, color: AppColors.muted),
-                  border: InputBorder.none,
+            child: Row(
+              children: [
+                Expanded(
+                  child: AnimatedSwitcher(
+                    duration: Motion.fast,
+                    child: _recorder.recording
+                        ? RecordingBar(
+                            key: const ValueKey('rec'),
+                            recorder: _recorder,
+                            cancelling: _cancelling,
+                          )
+                        : Row(
+                            key: const ValueKey('type'),
+                            children: [
+                              IconButton(
+                                tooltip: 'Stickers',
+                                onPressed: () {
+                                  FocusScope.of(context).unfocus();
+                                  setState(() => _stickers = !_stickers);
+                                },
+                                icon: AnimatedSwitcher(
+                                  duration: Motion.fast,
+                                  child: Icon(
+                                    _stickers
+                                        ? Icons.keyboard_rounded
+                                        : Icons.emoji_emotions_outlined,
+                                    key: ValueKey(_stickers),
+                                  ),
+                                ),
+                              ),
+                              Expanded(
+                                child: TextField(
+                                  controller: _input,
+                                  textInputAction: TextInputAction.send,
+                                  onTap: () =>
+                                      setState(() => _stickers = false),
+                                  onSubmitted: (_) => _send(),
+                                  style: tx(15),
+                                  decoration: InputDecoration(
+                                    hintText: 'Message',
+                                    hintStyle: tx(15, color: AppColors.muted),
+                                    border: InputBorder.none,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                  ),
                 ),
-              ),
-            ),
-            // The tools morph into a send button as soon as you type.
-            AnimatedSwitcher(
-              duration: Motion.normal,
-              transitionBuilder: (child, a) => ScaleTransition(
-                scale: CurvedAnimation(parent: a, curve: Curves.easeOutBack),
-                child: FadeTransition(opacity: a, child: child),
-              ),
-              child: hasText
-                  ? Pressable(
-                      key: const ValueKey('send'),
-                      onTap: _send,
-                      child: Container(
-                        width: 42,
-                        height: 42,
-                        margin: const EdgeInsets.only(right: 2),
-                        decoration: const BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: AppColors.accent,
-                        ),
-                        child: const Icon(
-                          Icons.arrow_upward_rounded,
-                          color: Colors.white,
-                        ),
-                      ),
-                    )
-                  : Row(
-                      key: const ValueKey('tools'),
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        IconButton(
-                          onPressed: () => _soon('Files'),
-                          icon: const Icon(Icons.attach_file),
-                        ),
-                        IconButton(
-                          onPressed: () => _soon('Camera'),
-                          icon: const Icon(Icons.photo_camera_outlined),
-                        ),
-                        IconButton(
-                          onPressed: () => _soon('Voice note'),
-                          icon: const Icon(Icons.mic_none_rounded),
-                        ),
-                      ],
+                // The tools morph into a send button as soon as you type.
+                AnimatedSwitcher(
+                  duration: Motion.normal,
+                  transitionBuilder: (child, a) => ScaleTransition(
+                    scale: CurvedAnimation(
+                      parent: a,
+                      curve: Curves.easeOutBack,
                     ),
+                    child: FadeTransition(opacity: a, child: child),
+                  ),
+                  child: hasText
+                      ? Pressable(
+                          key: const ValueKey('send'),
+                          onTap: _send,
+                          child: Container(
+                            width: 42,
+                            height: 42,
+                            margin: const EdgeInsets.only(right: 2),
+                            decoration: const BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: AppColors.accent,
+                            ),
+                            child: const Icon(
+                              Icons.arrow_upward_rounded,
+                              color: Colors.white,
+                            ),
+                          ),
+                        )
+                      : Row(
+                          key: const ValueKey('tools'),
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (!_recorder.recording) ...[
+                              IconButton(
+                                tooltip: 'Photo',
+                                onPressed: () =>
+                                    _pickPhoto(ImageSource.gallery),
+                                icon: const Icon(Icons.photo_outlined),
+                              ),
+                              IconButton(
+                                tooltip: 'Camera',
+                                onPressed: () => _pickPhoto(ImageSource.camera),
+                                icon: const Icon(Icons.photo_camera_outlined),
+                              ),
+                            ],
+                            _micButton(),
+                          ],
+                        ),
+                ),
+              ],
             ),
-          ],
+          ),
+          // Sticker grid slides up under the message box.
+          AnimatedSize(
+            duration: Motion.normal,
+            curve: Motion.ease,
+            child: _stickers
+                ? StickerPicker(onPick: _sendSticker)
+                : const SizedBox(width: double.infinity),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Hold to record, slide left to cancel, release to send.
+  Widget _micButton() {
+    return GestureDetector(
+      onTap: () => _hint('Hold the mic to record, release to send'),
+      onLongPressStart: (_) async {
+        final error = await _recorder.start();
+        if (error != null) {
+          _hint(error);
+        } else {
+          setState(() => _cancelling = false);
+        }
+      },
+      onLongPressMoveUpdate: (d) {
+        final cancel = d.offsetFromOrigin.dx < -80;
+        if (cancel != _cancelling) {
+          HapticFeedback.selectionClick();
+          setState(() => _cancelling = cancel);
+        }
+      },
+      onLongPressEnd: (_) async {
+        if (_cancelling) {
+          await _recorder.cancel();
+          return;
+        }
+        final rec = await _recorder.stop();
+        if (rec == null) return;
+        HapticFeedback.lightImpact();
+        widget.store.sendMedia(
+          node,
+          Message(
+            '🎤 Voice note',
+            kind: MessageKind.voice,
+            localPath: rec.path,
+            duration: rec.duration,
+            waveform: rec.waveform,
+          ),
+          bytes: rec.bytes,
+          contentType: rec.contentType,
+        );
+      },
+      child: AnimatedScale(
+        scale: _recorder.recording ? 1.35 : 1,
+        duration: Motion.normal,
+        curve: Curves.easeOutBack,
+        child: Container(
+          width: 44,
+          height: 44,
+          margin: const EdgeInsets.only(right: 2),
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: _recorder.recording
+                ? (_cancelling ? AppColors.muted : const Color(0xFFE5484D))
+                : Colors.transparent,
+          ),
+          child: Icon(
+            Icons.mic_rounded,
+            color: _recorder.recording ? Colors.white : AppColors.ink,
+          ),
         ),
       ),
     );
+  }
+
+  Future<void> _pickPhoto(ImageSource source) async {
+    try {
+      final file = await ImagePicker().pickImage(
+        source: source,
+        maxWidth: 1600,
+        imageQuality: 82,
+      );
+      if (file == null) return;
+      final bytes = await file.readAsBytes();
+      final type = file.mimeType ?? _guessType(file.name);
+      widget.store.sendMedia(
+        node,
+        Message('📷 Photo', kind: MessageKind.image, localBytes: bytes),
+        bytes: bytes,
+        contentType: type,
+      );
+    } catch (e) {
+      _hint('Couldn’t open the photos ($e)');
+    }
+  }
+
+  static String _guessType(String name) {
+    final n = name.toLowerCase();
+    if (n.endsWith('.png')) return 'image/png';
+    if (n.endsWith('.webp')) return 'image/webp';
+    if (n.endsWith('.gif')) return 'image/gif';
+    return 'image/jpeg';
+  }
+
+  void _sendSticker(String s) {
+    HapticFeedback.lightImpact();
+    widget.store.sendMedia(node, Message(s, kind: MessageKind.sticker));
+  }
+
+  void _hint(String text) {
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(text, style: tx(14, color: Colors.white)),
+          duration: const Duration(seconds: 2),
+        ),
+      );
   }
 }

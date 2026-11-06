@@ -12,6 +12,10 @@ spring:
       ddl-auto: validate   # tables come from Flyway migrations only
   flyway:
     locations: classpath:db/migration
+  servlet:
+    multipart:
+      max-file-size: 12MB
+      max-request-size: 12MB
 
 server:
   port: ${PORT:8080}

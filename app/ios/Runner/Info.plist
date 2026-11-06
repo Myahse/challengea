@@ -2,6 +2,12 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Challengea uses the microphone for voice notes and calls.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Challengea uses the camera to send photos and for video calls.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Challengea lets you send photos from your library.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>Challengea shows your position to your friends on the map. You can hide it any time with Ghost mode.</string>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
