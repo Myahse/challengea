@@ -1,0 +1,37 @@
+# Local development: Oracle Database 23ai Free + the Challengea API.
+#   docker compose up -d          (first start of Oracle takes ~30 s)
+#   API:    http://localhost:8080   (health: /actuator/health)
+#   Oracle: localhost:1521/FREEPDB1  user challengea / challengea_dev
+services:
+  oracle:
+    image: gvenzl/oracle-free:23-slim-faststart
+    environment:
+      ORACLE_PASSWORD: oracle_dev        # SYS/SYSTEM password (dev only)
+      APP_USER: challengea
+      APP_USER_PASSWORD: challengea_dev
+    ports:
+      - "1521:1521"
+    volumes:
+      - oracle-data:/opt/oracle/oradata
+    healthcheck:
+      test: ["CMD", "healthcheck.sh"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+
+  api:
+    build: .
+    depends_on:
+      oracle:
+        condition: service_healthy
+    environment:
+      DB_URL: jdbc:oracle:thin:@oracle:1521/FREEPDB1
+      DB_USER: challengea
+      DB_PASSWORD: challengea_dev
+      JWT_SECRET: change-me-in-production-at-least-32-characters
+      OTP_DEV_ECHO: "true"   # returns the SMS code in the response until an SMS provider is plugged in
+    ports:
+      - "8080:8080"
+
+volumes:
+  oracle-data:

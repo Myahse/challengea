@@ -1,0 +1,33 @@
+spring:
+  application:
+    name: challengea-api
+  datasource:
+    # Local dev: Oracle 23ai Free from docker-compose.yml
+    url: ${DB_URL:jdbc:oracle:thin:@localhost:1521/FREEPDB1}
+    username: ${DB_USER:challengea}
+    password: ${DB_PASSWORD:challengea_dev}
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate   # tables come from Flyway migrations only
+  flyway:
+    locations: classpath:db/migration
+
+server:
+  port: ${PORT:8080}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+
+app:
+  jwt:
+    # Set JWT_SECRET (at least 32 characters) in every real environment.
+    secret: ${JWT_SECRET:dev-only-secret-change-me-dev-only-secret-change-me}
+    ttl: ${JWT_TTL:30d}
+  otp:
+    ttl: 5m
+    # Dev only: return the SMS code in the API response (no SMS provider yet).
+    dev-echo: ${OTP_DEV_ECHO:true}
