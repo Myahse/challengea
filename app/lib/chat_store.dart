@@ -12,6 +12,7 @@ import 'geo.dart';
 import 'mock/chats.dart';
 import 'mock/people.dart';
 import 'models.dart';
+import 'stories.dart';
 
 class FriendSpot {
   FriendSpot(
@@ -110,6 +111,21 @@ class ChatStore extends ChangeNotifier {
 
   /// Friends who share their location (map page). Positions are in map pixels.
   final List<FriendSpot> spots = [];
+
+  /// Stories from the last 24 h (demo content for now), and mine.
+  final List<Story> stories = mockStories();
+  late final Story myStory = Story(me, []);
+
+  void markStorySeen(Story s) {
+    if (s.seen) return;
+    s.seen = true;
+    notifyListeners();
+  }
+
+  void addToMyStory(StoryItem item) {
+    myStory.items.add(item);
+    notifyListeners();
+  }
 
   /// My position on the drawn map.
   Offset get myPosition => online != null
@@ -353,7 +369,9 @@ class ChatStore extends ChangeNotifier {
   BubbleNode? addFriend() {
     if (online != null) return null; // online: the UI opens the friend search
     final existing = nodes.expand((n) => n.members).toSet();
-    final next = MockPeople.extras.where((p) => !existing.contains(p)).firstOrNull;
+    final next = MockPeople.extras
+        .where((p) => !existing.contains(p))
+        .firstOrNull;
     if (next == null) return null;
     final node = BubbleNode.person(next, home: const Offset(.5, .5), size: 34)
       ..spawn = 0;

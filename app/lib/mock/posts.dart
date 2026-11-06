@@ -58,14 +58,15 @@ void seedMockPosts(FeedData feed, Person mePerson, List<Person> friends) {
     ),
     Comment(f('awa'), 'The colors are crazy 🔥🔥', likes: 211, ago: '18h'),
     Comment(
-      f('maurice'),
-      'Big up from Koumassi!',
-      translation: 'Big up depuis Koumassi !',
-      likes: 96,
-      ago: '5h',
-    )..replies.add(
-      Comment(MockPeople.bob, 'Thanks bro 🙏', likes: 12, ago: '4h'),
-    ),
+        f('maurice'),
+        'Big up from Koumassi!',
+        translation: 'Big up depuis Koumassi !',
+        likes: 96,
+        ago: '5h',
+      )
+      ..replies.add(
+        Comment(MockPeople.bob, 'Thanks bro 🙏', likes: 12, ago: '4h'),
+      ),
   ];
 
   const green = [Color(0xFFB9C9C4), Color(0xFF2F5D50), Color(0xFF1C2B27)];

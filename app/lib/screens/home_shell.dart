@@ -1,13 +1,18 @@
+import 'dart:ui' show ImageFilter;
+
 import 'package:flutter/material.dart';
 
 import '../chat_store.dart';
 import '../games/challenge.dart';
+import '../games/games.dart';
+import '../widgets/motion.dart';
 import '../theme.dart';
 import 'chat_home.dart';
 import 'chat_screen.dart';
+import 'create.dart';
+import 'home_feed.dart';
 import 'incoming_call_screen.dart';
 import 'map_screen.dart';
-import 'profile_screen.dart';
 import 'video_feed.dart';
 
 /// Swipeable pages with a floating menu: Chats, Map, Videos, Profile.
@@ -25,7 +30,7 @@ class _HomeShellState extends State<HomeShell> {
   final _pages = PageController();
   int _page = 0;
 
-  static const _map = 1, _videos = 2, _count = 4;
+  static const _chats = 1, _videos = 2, _map = 3, _count = 4;
 
   void _go(int page) {
     final next = page.clamp(0, _count - 1);
@@ -77,21 +82,22 @@ class _HomeShellState extends State<HomeShell> {
     super.dispose();
   }
 
-  Widget _edge({required bool left}) => Positioned(
-    left: left ? 0 : null,
-    right: left ? null : 0,
-    top: 120,
-    bottom: 60,
-    width: 22,
-    child: GestureDetector(
-      behavior: HitTestBehavior.translucent,
-      onHorizontalDragEnd: (d) {
-        final v = d.primaryVelocity ?? 0;
-        if (left && v > 150) _go(_page - 1);
-        if (!left && v < -150) _go(_page + 1);
-      },
-    ),
-  );
+  /// Menu index (0 Home, 1 Chats, 2 = create, 3 Videos, 4 Map) -> page.
+  static int _pageOf(int menu) => menu < 2 ? menu : menu - 1;
+  static int _menuOf(int page) => page < 2 ? page : page + 1;
+
+  void _onMenu(int menu) {
+    if (menu == 2) {
+      showCreateMenu(
+        context,
+        widget.store,
+        onChallenge: () => challengeWithGame(context, widget.store, fourInRow),
+        onNewGroup: () => _go(_chats),
+      );
+      return;
+    }
+    _go(_pageOf(menu));
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -99,37 +105,44 @@ class _HomeShellState extends State<HomeShell> {
     final onDark = _page == _videos;
     final inset = MediaQuery.paddingOf(context).bottom;
     return Scaffold(
-      backgroundColor: onDark ? Colors.black : Colors.white,
+      backgroundColor: onDark ? Colors.black : AppColors.page,
       body: Stack(
         children: [
           PageView(
             controller: _pages,
-            // Chats and the map own their drags (bubbles, the map).
-            // The menu changes page there.
-            physics: _page == _map || _page == 0
-                ? const NeverScrollableScrollPhysics()
-                : const PageScrollPhysics(),
+            // Tabs change from the menu (each page owns its drags: bubbles, map, videos).
+            physics: const NeverScrollableScrollPhysics(),
             onPageChanged: (p) => setState(() => _page = p),
             children: [
+              HomeFeed(
+                store: store,
+                onOpenMap: () => _go(_map),
+                onOpenChats: () => _go(_chats),
+              ),
               ChatHome(store: store, onOpenMap: () => _go(_map)),
-              MapScreen(store: store),
               VideoFeed(
                 store: store,
                 posts: store.feed.forYou,
+                following: store.feed.following(
+                  store.friends.map((f) => f.id).toSet(),
+                ),
                 active: _page == _videos,
               ),
-              ProfileScreen(store: store, creator: store.feed.me),
+              MapScreen(store: store),
             ],
           ),
-          if (_page == _map) ...[_edge(left: true), _edge(left: false)],
           Positioned(
-            left: 16,
-            right: 16,
+            left: 14,
+            right: 14,
             bottom: inset + 10,
-            child: _BottomNav(
-              index: _page,
-              onDark: onDark,
-              onSelect: _go,
+            child: ListenableBuilder(
+              listenable: store,
+              builder: (context, _) => _BottomNav(
+                index: _menuOf(_page),
+                onDark: onDark,
+                unread: store.nodes.where((n) => n.unread > 0).length,
+                onSelect: _onMenu,
+              ),
             ),
           ),
         ],
@@ -138,106 +151,144 @@ class _HomeShellState extends State<HomeShell> {
   }
 }
 
+/// Floating, frosted menu with a gradient create button in the middle.
 class _BottomNav extends StatelessWidget {
   const _BottomNav({
     required this.index,
     required this.onDark,
+    required this.unread,
     required this.onSelect,
   });
 
   final int index;
   final bool onDark;
+  final int unread;
   final ValueChanged<int> onSelect;
 
-  static const _items = <(IconData, String)>[
-    (Icons.chat_bubble_rounded, 'Chats'),
-    (Icons.map_rounded, 'Map'),
-    (Icons.smart_display_rounded, 'Videos'),
-    (Icons.person_rounded, 'Profile'),
+  static const _items = <(IconData, IconData, String)>[
+    (Icons.home_outlined, Icons.home_rounded, 'Home'),
+    (Icons.chat_bubble_outline_rounded, Icons.chat_bubble_rounded, 'Chats'),
+    (Icons.add, Icons.add, ''),
+    (Icons.smart_display_outlined, Icons.smart_display_rounded, 'Videos'),
+    (Icons.explore_outlined, Icons.explore_rounded, 'Map'),
   ];
 
   @override
   Widget build(BuildContext context) {
     final fg = onDark ? Colors.white : AppColors.ink;
-    final muted = onDark ? const Color(0xFFC8C8C8) : const Color(0xFF5E5E5E);
-    final wash = onDark ? Colors.white : AppColors.ink;
-    return Row(
-      children: [
-        for (var i = 0; i < _items.length; i++)
-          Expanded(
-            child: _NavItem(
-              icon: _items[i].$1,
-              label: _items[i].$2,
-              selected: i == index,
-              color: i == index ? fg : muted,
-              wash: wash,
-              onTap: () => onSelect(i),
+    final muted = onDark ? Colors.white60 : const Color(0xFF7A7A7A);
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(30),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+        child: AnimatedContainer(
+          duration: Motion.normal,
+          height: 66,
+          decoration: BoxDecoration(
+            color: onDark
+                ? Colors.black.withValues(alpha: .35)
+                : Colors.white.withValues(alpha: .82),
+            borderRadius: BorderRadius.circular(30),
+            border: Border.all(
+              color: onDark
+                  ? Colors.white12
+                  : Colors.black.withValues(alpha: .05),
             ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: .08),
+                blurRadius: 24,
+                offset: const Offset(0, 8),
+              ),
+            ],
           ),
-      ],
-    );
-  }
-}
-
-class _NavItem extends StatelessWidget {
-  const _NavItem({
-    required this.icon,
-    required this.label,
-    required this.selected,
-    required this.color,
-    required this.wash,
-    required this.onTap,
-  });
-
-  final IconData icon;
-  final String label;
-  final bool selected;
-  final Color color;
-  final Color wash;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Semantics(
-      button: true,
-      selected: selected,
-      label: label,
-      child: InkWell(
-        onTap: onTap,
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            AnimatedContainer(
-              duration: const Duration(milliseconds: 180),
-              curve: Curves.easeOutCubic,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-              decoration: BoxDecoration(
-                color: selected ? wash.withValues(alpha: .1) : Colors.transparent,
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: Icon(
-                icon,
-                size: 22,
-                color: color,
-                shadows: const [
-                  Shadow(color: Color(0x33000000), blurRadius: 8),
-                ],
-              ),
-            ),
-            const SizedBox(height: 2),
-            Text(
-              label,
-              style: tx(
-                11,
-                weight: selected ? FontWeight.w600 : FontWeight.w500,
-                color: color,
-              ).copyWith(
-                shadows: const [
-                  Shadow(color: Color(0x33000000), blurRadius: 8),
-                ],
-              ),
-            ),
-          ],
+          child: Row(
+            children: [
+              for (var i = 0; i < _items.length; i++)
+                Expanded(
+                  child: i == 2
+                      ? Center(
+                          child: Pressable(
+                            scale: .85,
+                            onTap: () => onSelect(2),
+                            child: Container(
+                              width: 50,
+                              height: 40,
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(14),
+                                gradient: const LinearGradient(
+                                  colors: AppColors.brandGradient,
+                                ),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: const Color(
+                                      0xFFFF3D7F,
+                                    ).withValues(alpha: .35),
+                                    blurRadius: 12,
+                                    offset: const Offset(0, 4),
+                                  ),
+                                ],
+                              ),
+                              child: const Icon(
+                                Icons.add_rounded,
+                                color: Colors.white,
+                                size: 30,
+                              ),
+                            ),
+                          ),
+                        )
+                      : Pressable(
+                          onTap: () => onSelect(i),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              AnimatedScale(
+                                scale: i == index ? 1.12 : 1,
+                                duration: Motion.normal,
+                                curve: Curves.easeOutBack,
+                                child: Badge(
+                                  isLabelVisible: i == 1 && unread > 0,
+                                  label: Text('$unread'),
+                                  backgroundColor: const Color(0xFF25D366),
+                                  child: Icon(
+                                    i == index ? _items[i].$2 : _items[i].$1,
+                                    color: i == index ? fg : muted,
+                                    size: 26,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              AnimatedDefaultTextStyle(
+                                duration: Motion.fast,
+                                style: tx(
+                                  11,
+                                  weight: i == index
+                                      ? FontWeight.w700
+                                      : FontWeight.w500,
+                                  color: i == index ? fg : muted,
+                                ),
+                                child: Text(_items[i].$3),
+                              ),
+                              // Little active dot.
+                              AnimatedContainer(
+                                duration: Motion.normal,
+                                curve: Motion.ease,
+                                margin: const EdgeInsets.only(top: 3),
+                                width: i == index ? 16 : 0,
+                                height: 3,
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(2),
+                                  gradient: const LinearGradient(
+                                    colors: AppColors.brandGradient,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                ),
+            ],
+          ),
         ),
       ),
     );

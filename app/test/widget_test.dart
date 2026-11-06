@@ -8,6 +8,7 @@ import 'package:challengea/games/four_logic.dart';
 import 'package:challengea/games/games.dart';
 import 'package:challengea/games/sudoku_logic.dart';
 import 'package:challengea/main.dart';
+import 'package:challengea/models.dart';
 import 'package:challengea/screens/chat_home.dart';
 import 'package:challengea/screens/map_screen.dart';
 import 'package:challengea/screens/profile_screen.dart';
@@ -20,10 +21,17 @@ void main() {
     expect(find.text('Maurice'), findsOneWidget);
   });
 
-  testWidgets('app opens on the chat home', (tester) async {
+  testWidgets('app opens on the home feed with stories and the menu', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(430, 932);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
     await tester.pumpWidget(ChallengeaApp(store: ChatStore()));
-    await tester.pump(const Duration(milliseconds: 500));
+    await tester.pump(const Duration(milliseconds: 800));
+    expect(find.text('Your story'), findsOneWidget);
     expect(find.text('Tales'), findsOneWidget);
+    expect(find.text('Chats'), findsOneWidget); // menu
   });
 
   test('merging two friends creates a group, merging again adds to it', () {
@@ -51,13 +59,21 @@ void main() {
 
   test('messaging a friend from the map creates their chat bubble once', () {
     final store = ChatStore();
-    final celine = store.spots
-        .firstWhere((s) => s.person.name == 'Celine May')
-        .person;
+    // Someone on the map who doesn't have a bubble yet.
+    final withBubble = {
+      for (final n in store.nodes) ...n.members.map((m) => m.id),
+    };
+    final friend = store.spots
+        .map((s) => s.person)
+        .firstWhere(
+          (p) => !withBubble.contains(p.id),
+          orElse: () =>
+              const Person('newfriend', 'New Friend', Color(0xFF6FA8DC)),
+        );
     final before = store.nodes.length;
-    final node = store.nodeFor(celine);
+    final node = store.nodeFor(friend);
     expect(store.nodes.length, before + 1);
-    expect(identical(store.nodeFor(celine), node), isTrue);
+    expect(identical(store.nodeFor(friend), node), isTrue);
   });
 
   testWidgets('map page opens a friend card when a pin is tapped', (

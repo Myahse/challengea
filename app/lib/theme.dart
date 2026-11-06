@@ -16,6 +16,21 @@ class AppColors {
   static const storyRing = Color(0xFF8C6464);
   static const accent = Color(0xFF22C55E); // send button / highlights
   static const mergeTarget = Color(0xFF34C759);
+
+  /// Story rings, the create button: warm Snapchat / Instagram-like energy.
+  static const storyGradient = [
+    Color(0xFFFF3D7F),
+    Color(0xFFFF8A3D),
+    Color(0xFFFFC53D),
+    Color(0xFFFF3D7F),
+  ];
+  static const brandGradient = [Color(0xFFFF3D7F), Color(0xFFFF8A3D)];
+
+  /// Grey page behind feed cards (Facebook-style).
+  static const page = Color(0xFFF2F3F5);
+  static const card = Colors.white;
+  static const line = Color(0xFFE9E9EC);
+  static const like = Color(0xFF1877F2);
 }
 
 TextStyle tx(

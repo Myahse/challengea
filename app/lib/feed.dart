@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 
 import 'mock/posts.dart';
@@ -62,7 +64,22 @@ class Post {
     this.products = const [],
     List<Comment>? comments,
     this.commentCount = 0,
+    this.photo,
+    this.ago = '2h',
+    this.textCard = false,
   }) : comments = comments ?? [];
+
+  /// Short text shown big on a coloured background (Facebook-style).
+  final bool textCard;
+
+  /// A photo posted from this phone (home feed).
+  final Uint8List? photo;
+
+  /// When it was posted, as shown on the card ("2h", "Just now").
+  final String ago;
+
+  /// My Facebook-style reaction (👍 ❤️ 😂 😮 😢 😡), or null.
+  String? reaction;
 
   final String id;
   final Creator author;
@@ -127,6 +144,50 @@ class FeedData extends ChangeNotifier {
 
   final Map<String, Creator> creators = {};
   final List<Post> forYou = [];
+
+  /// Posts I wrote from the composer (top of the home feed).
+  final List<Post> created = [];
+
+  /// The home feed: my new posts, then friends' videos and photos.
+  List<Post> get home {
+    final seen = <String>{};
+    final out = <Post>[];
+    void add(Post p) {
+      if (seen.add(p.id)) out.add(p);
+    }
+
+    created.forEach(add);
+    final pool = [
+      ...forYou,
+      for (final c in creators.values)
+        if (!c.isMe) ...c.posts.where((p) => p.kind != PostKind.story).take(3),
+    ];
+    pool.forEach(add);
+    return out;
+  }
+
+  /// Videos from the people in [ids] (the "Following" tab).
+  List<Post> following(Set<String> ids) => [
+    for (final c in creators.values)
+      if (!c.isMe && ids.contains(c.person.id))
+        ...c.posts.where((p) => p.kind == PostKind.video),
+  ];
+
+  void addPost(Post p) {
+    created.insert(0, p);
+    me.posts.insert(0, p);
+    notifyListeners();
+  }
+
+  /// Facebook reactions: tapping the same one again removes it.
+  void react(Post p, String? emoji) {
+    final had = p.reaction != null;
+    p.reaction = p.reaction == emoji ? null : emoji;
+    p.liked = p.reaction != null;
+    p.likes += (p.reaction != null ? 1 : 0) - (had ? 1 : 0);
+    notifyListeners();
+  }
+
   late Creator me;
 
   Creator creatorFor(Person p) => creators[p.id] ??= Creator(

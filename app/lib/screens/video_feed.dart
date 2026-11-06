@@ -23,9 +23,13 @@ class VideoFeed extends StatefulWidget {
     this.initialIndex = 0,
     this.pushed = false,
     this.active = true,
+    this.following,
   });
   final ChatStore store;
   final List<Post> posts;
+
+  /// Videos from people I follow: shows "Following | For you" tabs.
+  final List<Post>? following;
   final int initialIndex;
 
   /// Opened from a profile (shows a back button).
@@ -59,6 +63,22 @@ class VideoFeed extends StatefulWidget {
 class _VideoFeedState extends State<VideoFeed> {
   late final _pages = PageController(initialPage: widget.initialIndex);
   late int _index = widget.initialIndex;
+  bool _followingTab = false;
+
+  List<Post> get _posts {
+    final f = widget.following;
+    return _followingTab && f != null && f.isNotEmpty ? f : widget.posts;
+  }
+
+  void _switchTab(bool following) {
+    if (following == _followingTab) return;
+    HapticFeedback.selectionClick();
+    setState(() {
+      _followingTab = following;
+      _index = 0;
+    });
+    if (_pages.hasClients) _pages.jumpToPage(0);
+  }
 
   @override
   void dispose() {
@@ -69,19 +89,21 @@ class _VideoFeedState extends State<VideoFeed> {
   @override
   Widget build(BuildContext context) {
     final top = MediaQuery.paddingOf(context).top;
-    final current = widget.posts[_index];
+    final posts = _posts;
+    final current = posts[_index.clamp(0, posts.length - 1)];
     return Scaffold(
       backgroundColor: Colors.black,
       body: Stack(
         children: [
           PageView.builder(
+            key: ValueKey(_followingTab),
             controller: _pages,
             scrollDirection: Axis.vertical,
-            itemCount: widget.posts.length,
+            itemCount: posts.length,
             onPageChanged: (i) => setState(() => _index = i),
             itemBuilder: (context, i) => _VideoPage(
               store: widget.store,
-              post: widget.posts[i],
+              post: posts[i],
               playing: widget.active && i == _index,
               bottomInset: widget.pushed
                   ? 16
@@ -152,15 +174,72 @@ class _VideoFeedState extends State<VideoFeed> {
               left: 0,
               right: 0,
               top: top + 20,
-              child: IgnorePointer(
-                child: Text(
-                  'Video',
-                  textAlign: TextAlign.center,
-                  style: tx(16, color: Colors.white),
-                ),
-              ),
+              child: widget.following == null || widget.pushed
+                  ? IgnorePointer(
+                      child: Text(
+                        'Video',
+                        textAlign: TextAlign.center,
+                        style: tx(16, color: Colors.white),
+                      ),
+                    )
+                  : Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        _tab(
+                          'Following',
+                          _followingTab,
+                          () => _switchTab(true),
+                        ),
+                        Container(
+                          width: 1,
+                          height: 14,
+                          margin: const EdgeInsets.symmetric(horizontal: 6),
+                          color: Colors.white38,
+                        ),
+                        _tab(
+                          'For you',
+                          !_followingTab,
+                          () => _switchTab(false),
+                        ),
+                      ],
+                    ),
             ),
         ],
+      ),
+    );
+  }
+
+  Widget _tab(String label, bool selected, VoidCallback onTap) {
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            AnimatedDefaultTextStyle(
+              duration: const Duration(milliseconds: 180),
+              style: tx(
+                selected ? 17 : 16,
+                weight: selected ? FontWeight.w700 : FontWeight.w500,
+                color: selected ? Colors.white : Colors.white60,
+              ),
+              child: Text(label),
+            ),
+            const SizedBox(height: 4),
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 220),
+              curve: Curves.easeOutCubic,
+              width: selected ? 22 : 0,
+              height: 3,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

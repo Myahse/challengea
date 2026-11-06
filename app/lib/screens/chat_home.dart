@@ -3,8 +3,6 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 
 import '../chat_store.dart';
-import '../games/challenge.dart';
-import '../games/games.dart';
 import '../models.dart';
 import '../theme.dart';
 import '../widgets/avatar.dart';
@@ -178,58 +176,6 @@ class _ChatHomeState extends State<ChatHome> {
     );
   }
 
-  /// All games, with a short description.
-  void _explore() {
-    showModalBottomSheet(
-      context: context,
-      showDragHandle: true,
-      backgroundColor: Colors.white,
-      builder: (ctx) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text('Tales', style: tx(18, weight: FontWeight.w700)),
-            Text(
-              'Challenge your friends 1 vs 1',
-              style: tx(13, color: AppColors.muted),
-            ),
-            const SizedBox(height: 8),
-            for (final g in allGames)
-              ListTile(
-                leading: Container(
-                  width: 46,
-                  height: 46,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(12),
-                    gradient: LinearGradient(colors: g.colors),
-                  ),
-                  child: Icon(g.icon, color: Colors.white),
-                ),
-                title: Text(g.name, style: tx(15, weight: FontWeight.w600)),
-                subtitle: Text(
-                  g.tagline,
-                  style: tx(12, color: AppColors.muted),
-                ),
-                trailing: g.playable
-                    ? FilledButton(
-                        style: FilledButton.styleFrom(
-                          backgroundColor: AppColors.ink,
-                        ),
-                        onPressed: () {
-                          Navigator.pop(ctx);
-                          challengeWithGame(context, store, g);
-                        },
-                        child: const Text('Play'),
-                      )
-                    : Text('Soon', style: tx(13, color: AppColors.muted)),
-              ),
-            const SizedBox(height: 12),
-          ],
-        ),
-      ),
-    );
-  }
-
   /// Alternative to dragging bubbles: pick friends from a list.
   void _newGroup() {
     final picked = <Person>{};
@@ -304,329 +250,487 @@ class _ChatHomeState extends State<ChatHome> {
     );
   }
 
+  bool _list = false; // Bubbles (default) or a WhatsApp-style list
+  String _filter = 'All';
+  String _query = '';
+
+  List<BubbleNode> _sorted() {
+    DateTime last(BubbleNode n) =>
+        n.messages.isEmpty ? DateTime(2000) : n.messages.last.time;
+    final q = _query.toLowerCase();
+    return store.nodes.where((n) {
+      if (q.isNotEmpty && !n.displayName.toLowerCase().contains(q)) {
+        return false;
+      }
+      return switch (_filter) {
+        'Unread' => n.unread > 0,
+        'Groups' => n.isGroup,
+        _ => true,
+      };
+    }).toList()..sort((a, b) => last(b).compareTo(last(a)));
+  }
+
   @override
   Widget build(BuildContext context) {
+    final top = MediaQuery.paddingOf(context).top;
     return Scaffold(
-      body: SafeArea(
-        bottom: false,
-        child: ListenableBuilder(
-          listenable: store,
-          builder: (context, _) => Column(
+      backgroundColor: Colors.white,
+      body: ListenableBuilder(
+        listenable: store,
+        builder: (context, _) {
+          final unread = store.nodes.where((n) => n.unread > 0).length;
+          return Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              FadeSlideIn(
-                child: _Header(
-                  me: store.me,
-                  requests: store.online?.incoming.length ?? 0,
-                  onProfile: () =>
-                      ProfileScreen.open(context, store, store.feed.me),
-                  onFriends: store.online == null
-                      ? null
-                      : () => showFriendsSheet(context, store.online!),
-                ),
-              ),
-              const SizedBox(height: 14),
-              FadeSlideIn(
-                delay: const Duration(milliseconds: 80),
-                child: _TalesRow(
-                  onPlay: (g) => challengeWithGame(context, store, g),
-                  onExplore: _explore,
-                ),
-              ),
-              FadeSlideIn(
-                delay: const Duration(milliseconds: 160),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
+              // Header: me, title, friends, Bubbles / List switch.
+              Padding(
+                padding: EdgeInsets.fromLTRB(16, top + 8, 10, 0),
+                child: Row(
                   children: [
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(18, 22, 18, 0),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.chat_bubble_rounded, size: 26),
-                          const SizedBox(width: 6),
-                          Text('Chats', style: tx(17, weight: FontWeight.w700)),
-                          const Spacer(),
-                          const Icon(Icons.more_horiz, size: 26),
-                        ],
-                      ),
+                    Pressable(
+                      onTap: () =>
+                          ProfileScreen.open(context, store, store.feed.me),
+                      child: PersonAvatar(store.me, diameter: 38),
                     ),
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(18, 4, 18, 0),
-                      child: Text(
-                        'Drag a bubble onto another to make a group',
-                        style: tx(12, color: AppColors.muted),
-                      ),
+                    const SizedBox(width: 10),
+                    Text(
+                      'Chats',
+                      style: tx(
+                        28,
+                        weight: FontWeight.w800,
+                      ).copyWith(letterSpacing: -.8),
                     ),
+                    const Spacer(),
+                    if (store.online != null)
+                      IconButton(
+                        tooltip: 'Friends',
+                        onPressed: () =>
+                            showFriendsSheet(context, store.online!),
+                        icon: Badge(
+                          isLabelVisible:
+                              (store.online?.incoming.length ?? 0) > 0,
+                          label: Text('${store.online?.incoming.length ?? 0}'),
+                          child: const Icon(Icons.person_add_alt_1_outlined),
+                        ),
+                      ),
+                    _ViewSwitch(
+                      list: _list,
+                      onChanged: (v) => setState(() => _list = v),
+                    ),
+                  ],
+                ),
+              ),
+              // Search + filters (WhatsApp).
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+                child: TextField(
+                  onChanged: (v) => setState(() => _query = v),
+                  style: tx(15),
+                  decoration: InputDecoration(
+                    isDense: true,
+                    prefixIcon: const Icon(
+                      Icons.search_rounded,
+                      color: AppColors.muted,
+                    ),
+                    hintText: 'Search',
+                    hintStyle: tx(15, color: AppColors.muted),
+                    filled: true,
+                    fillColor: AppColors.page,
+                    contentPadding: const EdgeInsets.symmetric(vertical: 12),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(24),
+                      borderSide: BorderSide.none,
+                    ),
+                  ),
+                ),
+              ),
+              SizedBox(
+                height: 48,
+                child: ListView(
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+                  children: [
+                    for (final f in ['All', 'Unread', 'Groups'])
+                      Padding(
+                        padding: const EdgeInsets.only(right: 8),
+                        child: Pressable(
+                          onTap: () => setState(() {
+                            _filter = f;
+                            // Filters show the list.
+                            if (f != 'All') {
+                              _list = true;
+                            }
+                          }),
+                          child: AnimatedContainer(
+                            duration: Motion.fast,
+                            padding: const EdgeInsets.symmetric(horizontal: 16),
+                            alignment: Alignment.center,
+                            decoration: BoxDecoration(
+                              color: _filter == f
+                                  ? const Color(0xFFDDF7E3)
+                                  : AppColors.page,
+                              borderRadius: BorderRadius.circular(18),
+                            ),
+                            child: Text(
+                              f == 'Unread' && unread > 0
+                                  ? 'Unread $unread'
+                                  : f,
+                              style: tx(
+                                13,
+                                weight: FontWeight.w700,
+                                color: _filter == f
+                                    ? const Color(0xFF0F7B36)
+                                    : const Color(0xFF555555),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
                   ],
                 ),
               ),
               Expanded(
-                child: Stack(
-                  children: [
-                    Positioned.fill(
-                      child: Padding(
-                        padding: EdgeInsets.fromLTRB(
-                          8,
-                          8,
-                          8,
-                          MediaQuery.paddingOf(context).bottom + 96,
-                        ),
-                        child: BubbleField(
-                          store: store,
-                          onOpen: _open,
-                          onLongPress: _longPress,
-                          onMerged: _onMerged,
-                        ),
-                      ),
+                child: AnimatedSwitcher(
+                  duration: Motion.normal,
+                  switchInCurve: Motion.ease,
+                  transitionBuilder: (child, a) => FadeTransition(
+                    opacity: a,
+                    child: ScaleTransition(
+                      scale: Tween(begin: .97, end: 1.0).animate(a),
+                      child: child,
                     ),
-                    // Above the bubble area so its button receives taps.
-                    if (store.isOnline && store.nodes.isEmpty)
-                      Positioned.fill(
-                        child: _EmptyFriends(
-                          onFind: () =>
-                              showFriendsSheet(context, store.online!),
+                  ),
+                  child: _list || _query.isNotEmpty
+                      ? KeyedSubtree(
+                          key: const ValueKey('list'),
+                          child: _chatList(),
+                        )
+                      : KeyedSubtree(
+                          key: const ValueKey('bubbles'),
+                          child: _bubbles(),
                         ),
-                      ),
-                    Positioned(
-                      right: 20,
-                      bottom: MediaQuery.paddingOf(context).bottom + 96,
-                      child: _SpeedDial(
-                        onMap: widget.onOpenMap,
-                        onAddFriend: () {
-                          if (store.online != null) {
-                            showFriendsSheet(context, store.online!);
-                          } else if (store.addFriend() == null) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text(
-                                  'No more demo friends',
-                                  style: tx(14, color: Colors.white),
-                                ),
-                              ),
-                            );
-                          }
-                        },
-                        onNewGroup: _newGroup,
-                      ),
-                    ),
-                  ],
                 ),
               ),
             ],
-          ),
+          );
+        },
+      ),
+    );
+  }
+
+  /// WhatsApp-style rows: avatar, name, last message, time, unread badge.
+  Widget _chatList() {
+    final chats = _sorted();
+    if (chats.isEmpty) {
+      return Center(
+        child: Text(
+          _query.isEmpty ? 'No chats here yet' : 'No match for "$_query"',
+          style: tx(14, color: AppColors.muted),
+        ),
+      );
+    }
+    return ListView.builder(
+      padding: const EdgeInsets.only(bottom: 120),
+      itemCount: chats.length,
+      itemBuilder: (context, i) => FadeSlideIn(
+        key: ValueKey(chats[i].id),
+        delay: Duration(milliseconds: i < 10 ? 30 * i : 0),
+        offset: const Offset(0, 14),
+        child: _ChatRow(
+          node: chats[i],
+          onTap: () => _open(chats[i]),
+          onLongPress: () => _longPress(chats[i]),
         ),
       ),
     );
   }
+
+  /// The signature bubbles: drag one onto another to make a group.
+  Widget _bubbles() {
+    return Stack(
+      children: [
+        Positioned.fill(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(8, 18, 8, 100),
+            child: BubbleField(
+              store: store,
+              onOpen: _open,
+              onLongPress: _longPress,
+              onMerged: _onMerged,
+            ),
+          ),
+        ),
+        Positioned(
+          left: 0,
+          right: 0,
+          top: 2,
+          child: IgnorePointer(
+            child: Text(
+              'Drag a bubble onto another to make a group',
+              textAlign: TextAlign.center,
+              style: tx(12, color: AppColors.muted),
+            ),
+          ),
+        ),
+        // Above the bubble area so its button receives taps.
+        if (store.isOnline && store.nodes.isEmpty)
+          Positioned.fill(
+            child: _EmptyFriends(
+              onFind: () => showFriendsSheet(context, store.online!),
+            ),
+          ),
+        Positioned(
+          right: 18,
+          bottom: 110,
+          child: _SpeedDial(
+            onMap: widget.onOpenMap,
+            onAddFriend: () {
+              if (store.online != null) {
+                showFriendsSheet(context, store.online!);
+              } else if (store.addFriend() == null) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      'No more demo friends',
+                      style: tx(14, color: Colors.white),
+                    ),
+                  ),
+                );
+              }
+            },
+            onNewGroup: _newGroup,
+          ),
+        ),
+      ],
+    );
+  }
 }
 
-class _Header extends StatelessWidget {
-  const _Header({
-    required this.me,
-    this.requests = 0,
-    this.onProfile,
-    this.onFriends,
-  });
-  final Person me;
-  final int requests;
-  final VoidCallback? onProfile;
-  final VoidCallback? onFriends;
+/// Bubbles / List toggle.
+class _ViewSwitch extends StatelessWidget {
+  const _ViewSwitch({required this.list, required this.onChanged});
+  final bool list;
+  final ValueChanged<bool> onChanged;
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 20, 0),
-      child: Row(
-        children: [
-          GestureDetector(
-            onTap: onProfile,
-            behavior: HitTestBehavior.opaque,
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(3),
-                  decoration: const BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: AppColors.bubble,
-                  ),
-                  child: PersonAvatar(me, diameter: 42),
-                ),
-                const SizedBox(width: 8),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(me.name, style: tx(16, weight: FontWeight.w700)),
-                    Row(
-                      children: [
-                        Container(
-                          width: 6,
-                          height: 6,
-                          decoration: const BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: AppColors.online,
-                          ),
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          'Online',
-                          style: tx(
-                            12,
-                            weight: FontWeight.w500,
-                            color: AppColors.muted,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          const Spacer(),
-          if (onFriends != null) ...[
-            IconButton(
-              tooltip: 'Friends',
-              onPressed: onFriends,
-              icon: Badge(
-                isLabelVisible: requests > 0,
-                label: Text('$requests'),
-                child: const Icon(Icons.people_alt_outlined, size: 26),
+    Widget seg(IconData icon, bool selected, VoidCallback onTap, String tip) =>
+        Tooltip(
+          message: tip,
+          child: Pressable(
+            onTap: onTap,
+            child: AnimatedContainer(
+              duration: Motion.fast,
+              width: 40,
+              height: 34,
+              decoration: BoxDecoration(
+                color: selected ? AppColors.ink : Colors.transparent,
+                borderRadius: BorderRadius.circular(17),
+              ),
+              child: Icon(
+                icon,
+                size: 19,
+                color: selected ? Colors.white : AppColors.ink,
               ),
             ),
-            const SizedBox(width: 4),
-          ],
-          const Icon(Icons.card_giftcard_rounded, size: 24),
-          const SizedBox(width: 12),
-          const Icon(Icons.storefront_rounded, size: 24),
+          ),
+        );
+    return Container(
+      padding: const EdgeInsets.all(3),
+      decoration: BoxDecoration(
+        color: AppColors.page,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          seg(
+            Icons.bubble_chart_rounded,
+            !list,
+            () => onChanged(false),
+            'Bubbles',
+          ),
+          seg(Icons.view_agenda_rounded, list, () => onChanged(true), 'List'),
         ],
       ),
     );
   }
 }
 
-/// "Tales" = the games row. Tap a game to challenge a friend.
-class _TalesRow extends StatelessWidget {
-  const _TalesRow({required this.onPlay, required this.onExplore});
-  final ValueChanged<GameInfo> onPlay;
-  final VoidCallback onExplore;
+/// One WhatsApp-style chat row.
+class _ChatRow extends StatelessWidget {
+  const _ChatRow({
+    required this.node,
+    required this.onTap,
+    required this.onLongPress,
+  });
+  final BubbleNode node;
+  final VoidCallback onTap;
+  final VoidCallback onLongPress;
+
+  static String _time(DateTime t) {
+    final now = DateTime.now();
+    final d = DateTime(
+      now.year,
+      now.month,
+      now.day,
+    ).difference(DateTime(t.year, t.month, t.day)).inDays;
+    if (d == 0) {
+      return '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
+    }
+    if (d == 1) return 'Yesterday';
+    if (d < 7) {
+      return const ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][t.weekday -
+          1];
+    }
+    return '${t.day}/${t.month}';
+  }
+
+  String _preview(Message m) {
+    final who = node.isGroup && !m.isMine && m.sender != null
+        ? '${m.sender!.firstName}: '
+        : (m.isMine ? 'You: ' : '');
+    return switch (m.kind) {
+      MessageKind.image => '$who📷 Photo',
+      MessageKind.voice =>
+        '$who🎤 Voice note${m.duration != null ? ' (${m.duration!.inSeconds}s)' : ''}',
+      MessageKind.sticker => '$who${m.text} Sticker',
+      MessageKind.text => '$who${m.text}',
+    };
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: Row(
-            children: [
-              const Icon(Icons.auto_awesome, size: 24),
-              const SizedBox(width: 4),
-              Text('Tales', style: tx(17, weight: FontWeight.w700)),
-              const Spacer(),
-              InkWell(
-                borderRadius: BorderRadius.circular(20),
-                onTap: onExplore,
-                child: Container(
-                  padding: const EdgeInsets.fromLTRB(14, 4, 8, 4),
-                  decoration: BoxDecoration(
-                    border: Border.all(color: AppColors.ink),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Row(
-                    children: [
-                      Text('Explore', style: tx(13, weight: FontWeight.w600)),
-                      const Icon(Icons.chevron_right, size: 16),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 10),
-        SizedBox(
-          height: 104,
-          child: ListView.separated(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            itemCount: allGames.length + 1,
-            separatorBuilder: (_, _) => const SizedBox(width: 10),
-            itemBuilder: (context, i) {
-              if (i == allGames.length) {
-                return Container(
-                  width: 88,
-                  height: 88,
-                  decoration: BoxDecoration(
-                    color: AppColors.bubble,
-                    borderRadius: BorderRadius.circular(18),
-                  ),
-                );
-              }
-              final g = allGames[i];
-              return FadeSlideIn(
-                delay: Duration(milliseconds: 160 + i * 70),
-                offset: const Offset(40, 0),
-                scale: .85,
-                child: Pressable(
-                  onTap: () => onPlay(g),
-                  child: Column(
-                    children: [
-                      Container(
-                        width: 88,
-                        height: 88,
+    final last = node.messages.isEmpty ? null : node.messages.last;
+    final bold = node.unread > 0;
+    final person = node.isGroup ? null : node.members.first;
+    return InkWell(
+      onTap: onTap,
+      onLongPress: onLongPress,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 9, 16, 9),
+        child: Row(
+          children: [
+            SizedBox(
+              width: 54,
+              height: 54,
+              child: Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  node.isGroup
+                      ? GroupAvatar(node.members, diameter: 54)
+                      : PersonAvatar(person!, diameter: 54),
+                  if (person != null && person.online)
+                    Positioned(
+                      right: 1,
+                      bottom: 1,
+                      child: Container(
+                        width: 14,
+                        height: 14,
                         decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(18),
-                          gradient: LinearGradient(
-                            colors: g.colors,
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
+                          shape: BoxShape.circle,
+                          color: AppColors.online,
+                          border: Border.all(color: Colors.white, width: 2.5),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          node.displayName,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: tx(
+                            16,
+                            weight: bold ? FontWeight.w800 : FontWeight.w600,
                           ),
                         ),
-                        child: Stack(
-                          children: [
-                            Center(
-                              child: Icon(
-                                g.icon,
-                                size: 44,
+                      ),
+                      if (last != null)
+                        Text(
+                          _time(last.time),
+                          style: tx(
+                            12,
+                            weight: bold ? FontWeight.w700 : FontWeight.w400,
+                            color: bold
+                                ? const Color(0xFF0F9D58)
+                                : AppColors.muted,
+                          ),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 3),
+                  Row(
+                    children: [
+                      if (last != null &&
+                          last.isMine &&
+                          last.kind == MessageKind.text)
+                        const Padding(
+                          padding: EdgeInsets.only(right: 4),
+                          child: Icon(
+                            Icons.done_all_rounded,
+                            size: 16,
+                            color: Color(0xFF34B7F1),
+                          ),
+                        ),
+                      Expanded(
+                        child: Text(
+                          last == null
+                              ? (node.isGroup
+                                    ? '${node.members.length} members'
+                                    : 'Say hi 👋')
+                              : _preview(last),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: tx(
+                            14,
+                            weight: bold ? FontWeight.w600 : FontWeight.w400,
+                            color: bold ? AppColors.ink : AppColors.muted,
+                          ),
+                        ),
+                      ),
+                      if (node.unread > 0)
+                        FadeSlideIn(
+                          scale: .3,
+                          offset: Offset.zero,
+                          duration: const Duration(milliseconds: 380),
+                          child: Container(
+                            margin: const EdgeInsets.only(left: 8),
+                            constraints: const BoxConstraints(minWidth: 22),
+                            height: 22,
+                            padding: const EdgeInsets.symmetric(horizontal: 6),
+                            alignment: Alignment.center,
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF25D366),
+                              borderRadius: BorderRadius.circular(11),
+                            ),
+                            child: Text(
+                              '${node.unread}',
+                              style: tx(
+                                12,
+                                weight: FontWeight.w800,
                                 color: Colors.white,
                               ),
                             ),
-                            if (!g.playable)
-                              Positioned(
-                                right: 6,
-                                top: 6,
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 5,
-                                    vertical: 1,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: Colors.black38,
-                                    borderRadius: BorderRadius.circular(6),
-                                  ),
-                                  child: Text(
-                                    'soon',
-                                    style: tx(
-                                      9,
-                                      weight: FontWeight.w700,
-                                      color: Colors.white,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                          ],
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(g.name, style: tx(10, weight: FontWeight.w500)),
                     ],
                   ),
-                ),
-              );
-            },
-          ),
+                ],
+              ),
+            ),
+          ],
         ),
-      ],
+      ),
     );
   }
 }
