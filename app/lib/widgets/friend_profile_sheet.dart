@@ -133,33 +133,34 @@ class FriendProfileSheet extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 12),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              SizedBox(
-                width: 14.0 * mutuals.length + 8,
-                height: 20,
-                child: Stack(
-                  children: [
-                    for (var i = 0; i < mutuals.length; i++)
-                      Positioned(
-                        left: i * 14.0,
-                        child: PersonAvatar(
-                          mutuals[i].person,
-                          diameter: 20,
-                          border: 1.5,
+          if (spot.common > 0)
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                SizedBox(
+                  width: 14.0 * mutuals.length + 8,
+                  height: 20,
+                  child: Stack(
+                    children: [
+                      for (var i = 0; i < mutuals.length; i++)
+                        Positioned(
+                          left: i * 14.0,
+                          child: PersonAvatar(
+                            mutuals[i].person,
+                            diameter: 20,
+                            border: 1.5,
+                          ),
                         ),
-                      ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
-              const SizedBox(width: 4),
-              Text(
-                '${spot.common} friends in common',
-                style: tx(12, color: AppColors.muted),
-              ),
-            ],
-          ),
+                const SizedBox(width: 4),
+                Text(
+                  '${spot.common} friends in common',
+                  style: tx(12, color: AppColors.muted),
+                ),
+              ],
+            ),
           const SizedBox(height: 14),
           Row(
             mainAxisAlignment: MainAxisAlignment.center,

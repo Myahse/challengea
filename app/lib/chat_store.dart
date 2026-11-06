@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import 'package:latlong2/latlong.dart';
 
+import 'api/online.dart';
 import 'call.dart';
 import 'feed.dart';
 import 'geo.dart';
@@ -12,34 +13,92 @@ import 'models.dart';
 class FriendSpot {
   FriendSpot(
     this.person,
-    this.position, {
+    Offset position, {
     required this.place,
     required this.status,
     required this.updated,
     required this.common,
-  });
+  }) : _position = position,
+       _real = null;
+
+  /// A friend at a real GPS position (from the backend).
+  FriendSpot.real(
+    this.person,
+    LatLng real, {
+    required this.place,
+    required this.status,
+    required this.updated,
+    this.common = 0,
+  }) : _position = null,
+       _real = real;
+
   final Person person;
-  final Offset position;
+  final Offset? _position;
+  final LatLng? _real;
   final String place;
   final String status;
   final String updated;
   final int common;
   bool get online => person.online;
-  LatLng get latLng => drawnToLatLng(position);
+
+  /// Position on the drawn map (demo) and real coordinates (real map).
+  Offset get position => _position ?? latLngToDrawn(_real!);
+  LatLng get latLng => _real ?? drawnToLatLng(_position!);
 }
 
-/// In-memory data for the prototype. Later this becomes a repository that
-/// talks to the Spring Boot / Oracle backend (conversations + members tables).
+/// The app's data. Demo mode: in-memory sample data. Online mode
+/// ([goOnline]): the same objects, filled and kept in sync by [OnlineSync].
 class ChatStore extends ChangeNotifier {
   ChatStore() {
     _seed();
+  }
+
+  /// Set when signed in to the backend.
+  OnlineSync? online;
+
+  /// Signs out and goes back to the sign-in screen (set by the app root).
+  Future<void> Function()? onSignOut;
+  bool get isOnline => online != null;
+
+  /// Switches from the demo data to the signed-in account.
+  void goOnline(OnlineSync sync, Person me) {
+    online = sync;
+    this.me = me;
+    nodes.clear();
+    spots.clear();
+    notifyListeners();
+  }
+
+  void replaceNodes(List<BubbleNode> fresh) {
+    nodes
+      ..clear()
+      ..addAll(fresh);
+    notifyListeners();
+  }
+
+  /// For [OnlineSync] (notifyListeners is protected).
+  void notifyChanged() => notifyListeners();
+
+  /// A bubble was dropped somewhere new.
+  void bubbleMoved(BubbleNode n) => online?.saveBubble(n);
+
+  /// A chat is shown on screen / closed.
+  void openChat(BubbleNode n) {
+    final o = online;
+    if (o == null) return;
+    o.openNode = n;
+    if (!n.loaded) o.loadMessages(n);
+  }
+
+  void closeChat(BubbleNode n) {
+    if (identical(online?.openNode, n)) online?.openNode = null;
   }
 
   Person me = const Person('me', 'Moise', Color(0xFFFF8A3D));
 
   void setMyName(String name) {
     if (name.trim().isEmpty) return;
-    me = Person('me', name.trim(), me.color);
+    me = Person(me.id, name.trim(), me.color);
     notifyListeners();
   }
 
@@ -64,7 +123,9 @@ class ChatStore extends ChangeNotifier {
   static const _celine = Person('celine', 'Celine May', Color(0xFF9B6B4F));
 
   /// Friends who share their location (map page). Positions are in map pixels.
-  late final List<FriendSpot> spots = [
+  final List<FriendSpot> spots = [];
+
+  late final List<FriendSpot> _demoSpots = [
     FriendSpot(
       _celine,
       const Offset(560, 760),
@@ -123,8 +184,10 @@ class ChatStore extends ChangeNotifier {
     ),
   ];
 
-  /// My position on the map.
-  final myPosition = const Offset(700, 1010);
+  /// My position on the drawn map.
+  Offset get myPosition => online != null
+      ? latLngToDrawn(myLocation ?? marcory)
+      : const Offset(700, 1010);
 
   /// Profiles, videos, comments.
   late final FeedData feed = FeedData(
@@ -164,6 +227,7 @@ class ChatStore extends ChangeNotifier {
 
   void setMyLocation(LatLng? v) {
     myLocation = v;
+    if (v != null) online?.pushLocation(v);
     notifyListeners();
   }
 
@@ -171,6 +235,7 @@ class ChatStore extends ChangeNotifier {
 
   void setGhostMode(bool v) {
     ghostMode = v;
+    online?.setGhost(v);
     notifyListeners();
   }
 
@@ -188,15 +253,18 @@ class ChatStore extends ChangeNotifier {
     final node = BubbleNode.person(p, home: const Offset(.5, .5), size: 34)
       ..spawn = 0;
     nodes.add(node);
+    if (online != null) node.pending = online!.ensureDirect(node);
     notifyListeners();
     return node;
   }
 
   /// Friends that have their own bubble (used by "Create group").
-  List<Person> get friends => [
-    for (final n in nodes)
-      if (!n.isGroup) n.members.first,
-  ];
+  List<Person> get friends =>
+      online?.friends ??
+      [
+        for (final n in nodes)
+          if (!n.isGroup) n.members.first,
+      ];
 
   BubbleNode createGroup(List<Person> members, {String? name}) {
     final group = BubbleNode.group(
@@ -206,11 +274,13 @@ class ChatStore extends ChangeNotifier {
       name: name,
     )..spawn = 0;
     nodes.add(group);
+    if (online != null) group.pending = online!.createGroup(group);
     notifyListeners();
     return group;
   }
 
   void _seed() {
+    spots.addAll(_demoSpots);
     final t = DateTime.now();
     nodes.addAll([
       BubbleNode.person(
@@ -308,8 +378,13 @@ class ChatStore extends ChangeNotifier {
     BubbleNode target,
   ) {
     if (target.isGroup) {
+      final added = dragged.members
+          .where((m) => !target.members.contains(m))
+          .toList();
       _addMembers(target, dragged.members);
-      if (dragged.isGroup) {
+      online?.addMembers(target, added);
+      // Online, the other group stays on the server (it may belong to someone else).
+      if (dragged.isGroup && online == null) {
         target.messages.addAll(dragged.messages);
         target.messages.sort((a, b) => a.time.compareTo(b.time));
         nodes.remove(dragged);
@@ -320,6 +395,7 @@ class ChatStore extends ChangeNotifier {
     }
     if (dragged.isGroup) {
       _addMembers(dragged, target.members);
+      online?.addMembers(dragged, target.members);
       dragged.spawn = 0.55;
       notifyListeners();
       return (group: dragged, created: false);
@@ -333,6 +409,7 @@ class ChatStore extends ChangeNotifier {
           ..pos = target.pos
           ..spawn = 0;
     nodes.add(group);
+    if (online != null) group.pending = online!.createGroup(group);
     notifyListeners();
     return (group: group, created: true);
   }
@@ -352,22 +429,30 @@ class ChatStore extends ChangeNotifier {
   }
 
   void removeMember(BubbleNode group, Person p) {
+    online?.removeMember(group, p);
     group.members.remove(p);
     if (group.members.length < 2) nodes.remove(group);
     notifyListeners();
   }
 
+  /// "Split group": online, you leave it (others keep it).
   void dissolve(BubbleNode group) {
+    online?.leave(group);
     nodes.remove(group);
     notifyListeners();
   }
 
   void rename(BubbleNode group, String name) {
     group.name = name.trim().isEmpty ? null : name.trim();
+    online?.rename(group, group.name);
     notifyListeners();
   }
 
   void send(BubbleNode node, String text) {
+    if (online != null) {
+      online!.send(node, text);
+      return;
+    }
     node.messages.add(Message(text));
     notifyListeners();
     // Fake a reply so the conversation feels alive in the prototype.
@@ -395,6 +480,7 @@ class ChatStore extends ChangeNotifier {
   }
 
   void markRead(BubbleNode node) {
+    online?.markRead(node);
     if (node.unread == 0) return;
     node.unread = 0;
     notifyListeners();
@@ -410,6 +496,7 @@ class ChatStore extends ChangeNotifier {
 
   /// Demo helper for the "+" button: adds the next friend bubble.
   BubbleNode? addFriend() {
+    if (online != null) return null; // online: the UI opens the friend search
     final existing = nodes.expand((n) => n.members).toSet();
     final next = _newFriends.where((p) => !existing.contains(p)).firstOrNull;
     if (next == null) return null;

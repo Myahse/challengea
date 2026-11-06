@@ -4,6 +4,7 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../api/online.dart';
 import '../chat_store.dart';
 import '../models.dart';
 import '../theme.dart';
@@ -20,25 +21,46 @@ class SudokuDuelScreen extends StatefulWidget {
     required this.store,
     required this.friend,
     required this.seed,
+    this.match,
   });
   final ChatStore store;
   final Person friend;
   final int seed;
+
+  /// Online match: the server holds the grid's solution and checks each answer.
+  final OnlineMatch? match;
 
   @override
   State<SudokuDuelScreen> createState() => _SudokuDuelScreenState();
 }
 
 class _SudokuDuelScreenState extends State<SudokuDuelScreen> {
-  late final SudokuPuzzle _puzzle = SudokuPuzzle.generate(seed: widget.seed);
+  late final SudokuPuzzle _puzzle = SudokuPuzzle.generate(
+    seed: widget.seed,
+  ); // demo only
+  OnlineMatch? get _m => widget.match;
+  late final List<List<int>> _givens = _m == null
+      ? _puzzle.givens
+      : [
+          for (var r = 0; r < 9; r++)
+            [
+              for (var c = 0; c < 9; c++)
+                ((_m!.state['givens'] as List)[r * 9 + c] as num).toInt(),
+            ],
+        ];
   late final List<List<int>> _grid = [
-    for (final r in _puzzle.givens) [...r],
+    for (final r in _givens) [...r],
   ];
   final Set<int> _wrong = {}; // cell index of wrong entries
-  late final int _toFill = _puzzle.blanks;
+  late final int _toFill = _m == null
+      ? _puzzle.blanks
+      : (_m!.state['toFill'] as num).toInt();
   int? _selected;
   int _mistakes = 0;
-  int _hints = 3;
+  late int _hints = _m == null
+      ? 3
+      : 0; // no hints online: the phone doesn't know the solution
+  int _serverFilled = 0;
   int _friendFilled = 0;
   final _started = DateTime.now();
   Timer? _clock;
@@ -48,7 +70,13 @@ class _SudokuDuelScreenState extends State<SudokuDuelScreen> {
 
   static const maxMistakes = 3;
 
+  Map<String, dynamic> _progress(int userId) =>
+      ((_m!.state['players'] as Map?)?['$userId'] as Map?)
+          ?.cast<String, dynamic>() ??
+      {};
+
   int get _filled {
+    if (_m != null) return _serverFilled;
     var n = 0;
     for (var i = 0; i < 81; i++) {
       final r = i ~/ 9, c = i % 9;
@@ -70,7 +98,33 @@ class _SudokuDuelScreenState extends State<SudokuDuelScreen> {
     _clock = Timer.periodic(const Duration(seconds: 1), (_) {
       if (mounted && !_over) setState(() {});
     });
-    _scheduleFriend();
+    if (_m != null) {
+      _m!.addListener(_onMatch);
+      _onMatch();
+    } else {
+      _scheduleFriend();
+    }
+  }
+
+  /// Server update (my answers, the friend's progress, the end).
+  void _onMatch() {
+    final online = widget.store.online!;
+    final mine = _progress(online.myId);
+    final theirs = _progress(online.idOf(widget.friend));
+    setState(() {
+      _serverFilled = (mine['filled'] as num?)?.toInt() ?? 0;
+      _mistakes = (mine['mistakes'] as num?)?.toInt() ?? 0;
+      _friendFilled = (theirs['filled'] as num?)?.toInt() ?? 0;
+    });
+    if (_m!.finished && !_over) {
+      final won = _m!.winnerId == online.myId;
+      final reason = won
+          ? 'Solved in $_elapsed'
+          : (_mistakes >= maxMistakes
+                ? '$maxMistakes mistakes'
+                : '${widget.friend.firstName} finished first');
+      _finish(won: won, reason: reason);
+    }
   }
 
   void _scheduleFriend() {
@@ -91,6 +145,7 @@ class _SudokuDuelScreenState extends State<SudokuDuelScreen> {
 
   @override
   void dispose() {
+    _m?.removeListener(_onMatch);
     _clock?.cancel();
     _friendTimer?.cancel();
     super.dispose();
@@ -100,7 +155,11 @@ class _SudokuDuelScreenState extends State<SudokuDuelScreen> {
     final s = _selected;
     if (_over || s == null) return;
     final r = s ~/ 9, c = s % 9;
-    if (_puzzle.givens[r][c] != 0) return;
+    if (_givens[r][c] != 0) return;
+    if (_m != null) {
+      _enterOnline(s, v);
+      return;
+    }
     setState(() {
       _grid[r][c] = v;
       if (v != 0 && v != _puzzle.solution[r][c]) {
@@ -117,6 +176,26 @@ class _SudokuDuelScreenState extends State<SudokuDuelScreen> {
     } else if (_filled == _toFill) {
       _finish(won: true, reason: 'Solved in $_elapsed');
     }
+  }
+
+  Future<void> _enterOnline(int cell, int v) async {
+    final online = widget.store.online!;
+    final mine = ((_progress(online.myId)['cells'] as List?) ?? []).map(
+      (e) => (e as num).toInt(),
+    );
+    if (mine.contains(cell)) return; // already solved, locked
+    setState(() => _grid[cell ~/ 9][cell % 9] = v);
+    if (v == 0) {
+      setState(() => _wrong.remove(cell));
+      return;
+    }
+    final error = await online.move(_m!, {'cell': cell, 'value': v});
+    if (!mounted || error != null) return;
+    final solved = ((_progress(online.myId)['cells'] as List?) ?? [])
+        .map((e) => (e as num).toInt())
+        .contains(cell);
+    setState(() => solved ? _wrong.remove(cell) : _wrong.add(cell));
+    solved ? HapticFeedback.selectionClick() : HapticFeedback.heavyImpact();
   }
 
   void _hint() {
@@ -141,15 +220,18 @@ class _SudokuDuelScreenState extends State<SudokuDuelScreen> {
     _over = true;
     _friendTimer?.cancel();
     final f = widget.friend.firstName;
-    postResult(
-      widget.store,
-      widget.friend,
-      sudokuDuel,
-      won
-          ? '🏆 I won our Sudoku duel in $_elapsed'
-          : '😅 $f won our Sudoku duel ($reason)',
-      won: won,
-    );
+    // Online, the server posts the result in your chat.
+    if (_m == null) {
+      postResult(
+        widget.store,
+        widget.friend,
+        sudokuDuel,
+        won
+            ? '🏆 I won our Sudoku duel in $_elapsed'
+            : '😅 $f won our Sudoku duel ($reason)',
+        won: won,
+      );
+    }
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -174,6 +256,16 @@ class _SudokuDuelScreenState extends State<SudokuDuelScreen> {
             style: FilledButton.styleFrom(backgroundColor: AppColors.ink),
             onPressed: () {
               Navigator.pop(ctx);
+              if (_m != null) {
+                final nav = Navigator.of(context)..pop();
+                startChallenge(
+                  nav.context,
+                  widget.store,
+                  widget.friend,
+                  sudokuDuel,
+                );
+                return;
+              }
               Navigator.pushReplacement(
                 context,
                 MaterialPageRoute(
@@ -331,7 +423,7 @@ class _SudokuDuelScreenState extends State<SudokuDuelScreen> {
   Widget _cell(int r, int c, int? sel, int selValue) {
     final i = r * 9 + c;
     final v = _grid[r][c];
-    final given = _puzzle.givens[r][c] != 0;
+    final given = _givens[r][c] != 0;
     final selected = sel == i;
     final related =
         sel != null &&
@@ -438,17 +530,18 @@ class _SudokuDuelScreenState extends State<SudokuDuelScreen> {
                 ),
                 label: Text('Erase', style: tx(14, weight: FontWeight.w600)),
               ),
-              TextButton.icon(
-                onPressed: _hints == 0 ? null : _hint,
-                icon: const Icon(
-                  Icons.lightbulb_outline_rounded,
-                  color: AppColors.ink,
+              if (_m == null)
+                TextButton.icon(
+                  onPressed: _hints == 0 ? null : _hint,
+                  icon: const Icon(
+                    Icons.lightbulb_outline_rounded,
+                    color: AppColors.ink,
+                  ),
+                  label: Text(
+                    'Hint ($_hints)',
+                    style: tx(14, weight: FontWeight.w600),
+                  ),
                 ),
-                label: Text(
-                  'Hint ($_hints)',
-                  style: tx(14, weight: FontWeight.w600),
-                ),
-              ),
             ],
           ),
         ],

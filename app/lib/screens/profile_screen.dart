@@ -62,6 +62,90 @@ class _ProfileScreenState extends State<ProfileScreen> {
       ),
     );
 
+  /// My profile: change name and bio; sign out (online).
+  void _editProfile() {
+    final online = widget.store.online;
+    if (online == null) {
+      _snack('Sign in to edit your profile (this is the demo)');
+      return;
+    }
+    final name = TextEditingController(text: c.person.name);
+    final bio = TextEditingController(text: c.bio);
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      backgroundColor: Colors.white,
+      builder: (ctx) => Padding(
+        padding: EdgeInsets.fromLTRB(
+          20,
+          0,
+          20,
+          20 + MediaQuery.viewInsetsOf(ctx).bottom,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              'Edit profile',
+              textAlign: TextAlign.center,
+              style: tx(18, weight: FontWeight.w700),
+            ),
+            const SizedBox(height: 14),
+            TextField(
+              controller: name,
+              decoration: const InputDecoration(labelText: 'Name'),
+            ),
+            const SizedBox(height: 10),
+            TextField(
+              controller: bio,
+              maxLines: 3,
+              maxLength: 500,
+              decoration: const InputDecoration(labelText: 'Bio'),
+            ),
+            const SizedBox(height: 10),
+            FilledButton(
+              style: FilledButton.styleFrom(
+                backgroundColor: AppColors.ink,
+                minimumSize: const Size.fromHeight(50),
+              ),
+              onPressed: () async {
+                Navigator.pop(ctx);
+                try {
+                  await online.api.patch('/me', {
+                    'displayName': name.text.trim(),
+                    'bio': bio.text.trim(),
+                  });
+                  widget.store.setMyName(name.text.trim());
+                  setState(() => c.bio = bio.text.trim());
+                  _snack('Profile saved');
+                } catch (e) {
+                  _snack('$e');
+                }
+              },
+              child: const Text('Save'),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.pop(ctx);
+                widget.store.onSignOut?.call();
+              },
+              child: Text(
+                'Sign out',
+                style: tx(
+                  15,
+                  weight: FontWeight.w600,
+                  color: const Color(0xFFE5484D),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   void _message() {
     final node = widget.store.nodeFor(c.person);
     Navigator.of(context).push(
@@ -210,9 +294,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
                   ),
                   GestureDetector(
-                    onTap: c.isMe
-                        ? () => _snack('Edit profile: coming with accounts')
-                        : () => feed.toggleFollow(c),
+                    onTap: c.isMe ? _editProfile : () => feed.toggleFollow(c),
                     child: AnimatedContainer(
                       duration: const Duration(milliseconds: 200),
                       width: 160,

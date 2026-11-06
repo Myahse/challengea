@@ -19,4 +19,16 @@ LatLng drawnToLatLng(Offset p) {
   return LatLng(marcory.latitude + dLat, marcory.longitude + dLng);
 }
 
+/// Inverse of [drawnToLatLng]: where a real position falls on the drawn map.
+Offset latLngToDrawn(LatLng p) {
+  const metersPerPixel = 3.0;
+  final dy = -(p.latitude - marcory.latitude) * 111320 / metersPerPixel;
+  final dx =
+      (p.longitude - marcory.longitude) *
+      111320 *
+      cos(marcory.latitude * pi / 180) /
+      metersPerPixel;
+  return Offset(700 + dx, 1010 + dy);
+}
+
 double distanceKm(LatLng a, LatLng b) => const Distance().distance(a, b) / 1000;

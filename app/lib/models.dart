@@ -17,9 +17,21 @@ class Person {
 }
 
 class Message {
-  Message(this.text, {this.sender, DateTime? time, this.game})
-    : time = time ?? DateTime.now();
+  Message(
+    this.text, {
+    this.sender,
+    DateTime? time,
+    this.game,
+    this.serverId,
+    this.isChallenge = false,
+  }) : time = time ?? DateTime.now();
+
+  /// A challenge invite (not a result): the card shows no Rematch button.
+  final bool isChallenge;
   final String text;
+
+  /// Id in the backend (null in demo mode or while sending).
+  final int? serverId;
 
   /// Set for game results posted in the chat (shows a Rematch button).
   final GameInfo? game;
@@ -58,6 +70,15 @@ class BubbleNode {
 
   final String id;
   final bool isGroup;
+
+  /// Conversation id in the backend (null in demo mode or until created).
+  int? serverId;
+
+  /// Completes when the server has created this conversation.
+  Future<void>? pending;
+
+  /// Messages were fetched from the server.
+  bool loaded = false;
   final List<Person> members;
   String? name;
   final List<Message> messages;

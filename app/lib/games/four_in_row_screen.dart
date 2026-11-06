@@ -3,6 +3,7 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../api/online.dart';
 import '../chat_store.dart';
 import '../models.dart';
 import '../theme.dart';
@@ -19,10 +20,14 @@ class FourInRowScreen extends StatefulWidget {
     required this.store,
     required this.friend,
     this.iStart = true,
+    this.match,
   });
   final ChatStore store;
   final Person friend;
   final bool iStart;
+
+  /// Online match: moves go through the server, the friend plays on their phone.
+  final OnlineMatch? match;
 
   @override
   State<FourInRowScreen> createState() => _FourInRowScreenState();
@@ -43,12 +48,78 @@ class _FourInRowScreenState extends State<FourInRowScreen> {
   @override
   void initState() {
     super.initState();
-    if (!_myTurn) _friendMove();
+    if (widget.match != null) {
+      widget.match!.addListener(_sync);
+      _sync();
+    } else if (!_myTurn) {
+      _friendMove();
+    }
+  }
+
+  @override
+  void dispose() {
+    widget.match?.removeListener(_sync);
+    super.dispose();
+  }
+
+  /// Copies the server's board (my discs = 1, friend's = 2).
+  void _sync() {
+    final m = widget.match!;
+    final online = widget.store.online!;
+    final mine = online.myId == m.challengerId ? 1 : 2;
+    final cells = (m.state['cells'] as List?) ?? [];
+    var changed = false;
+    for (var r = 0; r < FourBoard.rows && r < cells.length; r++) {
+      final row = cells[r] as List;
+      for (var c = 0; c < FourBoard.cols; c++) {
+        final v = (row[c] as num).toInt();
+        final local = v == 0 ? 0 : (v == mine ? 1 : 2);
+        if (_board.cells[r][c] != local) changed = true;
+        _board.cells[r][c] = local;
+      }
+    }
+    final lastCol = (m.state['lastCol'] as num?)?.toInt();
+    setState(() {
+      if (changed && lastCol != null) {
+        final top = List.generate(
+          FourBoard.rows,
+          (r) => r,
+        ).firstWhere((r) => _board.cells[r][lastCol] != 0, orElse: () => 0);
+        _last = (top, lastCol);
+        if (!_myTurn && m.currentTurnId == online.myId) {
+          HapticFeedback.lightImpact(); // friend played
+        }
+      }
+      _moves = (m.state['moves'] as num?)?.toInt() ?? 0;
+      _myTurn = m.currentTurnId == online.myId;
+      if (m.finished) {
+        _winner = m.winnerId == null ? 0 : (m.winnerId == online.myId ? 1 : 2);
+        final line = m.state['winLine'] as List?;
+        _winLine = line == null
+            ? null
+            : [for (final p in line) ((p as List)[0] as int, p[1] as int)];
+      }
+    });
+  }
+
+  Future<void> _playOnline(int col) async {
+    setState(() => _myTurn = false); // wait for the server
+    final error = await widget.store.online!.move(widget.match!, {'col': col});
+    if (error != null && mounted) {
+      _sync();
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Move refused ($error)')));
+    }
   }
 
   void _play(int col) {
     if (!_myTurn || _winner != null || !_board.canPlay(col)) return;
     HapticFeedback.selectionClick();
+    if (widget.match != null) {
+      _playOnline(col);
+      return;
+    }
     final row = _board.drop(col, 1)!;
     setState(() {
       _last = (row, col);
@@ -91,6 +162,11 @@ class _FourInRowScreenState extends State<FourInRowScreen> {
   }
 
   void _rematch() {
+    if (widget.match != null) {
+      final nav = Navigator.of(context)..pop();
+      startChallenge(nav.context, widget.store, widget.friend, fourInRow);
+      return;
+    }
     Navigator.pushReplacement(
       context,
       MaterialPageRoute(

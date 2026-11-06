@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../chat_store.dart';
+import '../games/challenge.dart';
 import '../theme.dart';
 import 'chat_home.dart';
 import 'map_screen.dart';
@@ -29,6 +30,28 @@ class _HomeShellState extends State<HomeShell> {
     duration: const Duration(milliseconds: 380),
     curve: Curves.easeOutCubic,
   );
+
+  @override
+  void initState() {
+    super.initState();
+    // Online: live invites and notices from other phones.
+    final online = widget.store.online;
+    if (online != null) {
+      online.onInvite = (m) {
+        if (mounted) showInvite(context, widget.store, m);
+      };
+      online.onNotice = (text) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(
+            SnackBar(
+              content: Text(text, style: tx(14, color: Colors.white)),
+            ),
+          );
+      };
+    }
+  }
 
   @override
   void dispose() {

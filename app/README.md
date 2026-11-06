@@ -67,16 +67,32 @@ or Google Maps.
 | Long-press a group | Members, remove a member, rename, split the group |
 | `+` button | Adds a demo friend |
 
-Data is fake and in memory (`lib/chat_store.dart`); no backend yet.
+Two modes:
+
+- **Connected** (phones / emulators): sign in with your phone number (SMS code)
+  or email; chats, friends, groups, bubble positions, the map and online games
+  go through the Challengea API (`../backend`), with live updates over WebSocket.
+- **Demo** (the shared web link, or "Try the demo"): sample data in memory.
 
 ## Run it
+
+Start the backend first (`cd ../backend && docker compose up -d`), then:
 
 ```bash
 cd app
 flutter pub get
-flutter run            # phone / emulator
-flutter run -d chrome  # browser
+flutter run
 ```
+
+- Android emulator: reaches your computer at `http://10.0.2.2:8080` automatically.
+- iOS simulator: `http://localhost:8080` automatically.
+- **Real phone** (same Wi-Fi as your computer): pass your computer's address,
+  e.g. `flutter run --dart-define=API_URL=http://192.168.1.20:8080`.
+- Browser: `flutter run -d chrome --dart-define=API_URL=http://localhost:8080`
+  (without `API_URL` the web build runs the demo).
+
+While no SMS provider is connected, the server shows the code on the sign-in
+screen ("Test server: your code is …").
 
 ## Code map
 
@@ -91,4 +107,6 @@ flutter run -d chrome  # browser
 - `lib/call.dart`, `lib/screens/call_screen.dart`, `lib/widgets/call_banner.dart` — calls
 - `lib/feed.dart`, `lib/screens/video_feed.dart`, `lib/screens/profile_screen.dart`, `lib/widgets/comments_sheet.dart`, `product_sheet.dart`, `fake_video.dart` — videos, profiles, shop
 - `lib/games/` — games list, challenge flow, Sudoku duel, Four in a row (logic is in `*_logic.dart`, tested)
+- `lib/api/` — API client, saved session, live events (STOMP), `online.dart` keeps the app in sync with the server
+- `lib/screens/sign_in_screen.dart` — phone / email sign-in
 - `lib/theme.dart` — colors and text styles from Figma (one place to update)

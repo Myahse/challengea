@@ -98,7 +98,7 @@ class Creator {
   });
   final Person person;
   final String handle;
-  final String bio;
+  String bio;
   int followers;
   final int following;
   final int likes;

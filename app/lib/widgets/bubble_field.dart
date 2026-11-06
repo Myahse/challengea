@@ -220,6 +220,7 @@ class _BubbleFieldState extends State<BubbleField>
       final p = _clamp(n.pos!, _r(n));
       n.home = Offset(p.dx / _size.width, p.dy / _size.height);
       _relocateOverlapping(n);
+      widget.store.bubbleMoved(n);
     }
   }
 

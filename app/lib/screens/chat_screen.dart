@@ -28,10 +28,12 @@ class _ChatScreenState extends State<ChatScreen> {
   void initState() {
     super.initState();
     _input.addListener(() => setState(() {}));
+    widget.store.openChat(node); // online: loads the history and marks it read
   }
 
   @override
   void dispose() {
+    widget.store.closeChat(node);
     _input.dispose();
     _scroll.dispose();
     super.dispose();
@@ -139,6 +141,14 @@ class _ChatScreenState extends State<ChatScreen> {
               listenable: widget.store,
               builder: (context, _) {
                 final msgs = node.messages.reversed.toList();
+                if (msgs.isEmpty && widget.store.isOnline && !node.loaded) {
+                  return const Center(
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: AppColors.ink,
+                    ),
+                  );
+                }
                 if (msgs.isEmpty) {
                   return Center(
                     child: Text(
@@ -261,7 +271,7 @@ class _ChatScreenState extends State<ChatScreen> {
                 ],
               ),
             ),
-            if (friend != null)
+            if (friend != null && !m.isChallenge)
               TextButton(
                 onPressed: () =>
                     startChallenge(context, widget.store, friend, g),

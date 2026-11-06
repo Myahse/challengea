@@ -27,6 +27,9 @@ app:
     # Set JWT_SECRET (at least 32 characters) in every real environment.
     secret: ${JWT_SECRET:dev-only-secret-change-me-dev-only-secret-change-me}
     ttl: ${JWT_TTL:30d}
+  cors:
+    # Web app origins allowed to call the API (comma-separated). Lock this down in production.
+    allowed-origins: ${CORS_ORIGINS:http://localhost:*,http://127.0.0.1:*}
   otp:
     ttl: 5m
     # Dev only: return the SMS code in the API response (no SMS provider yet).

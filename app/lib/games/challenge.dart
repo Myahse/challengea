@@ -1,7 +1,9 @@
 import 'dart:math';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
+import '../api/online.dart';
 import '../chat_store.dart';
 import '../models.dart';
 import '../theme.dart';
@@ -103,6 +105,7 @@ Future<void> startChallenge(
   GameInfo game,
 ) async {
   if (!game.playable) return _soon(context, game);
+  if (store.online != null) return _startOnline(context, store, friend, game);
   final accepted = await showDialog<bool>(
     context: context,
     barrierDismissible: false,
@@ -252,6 +255,215 @@ class _WaitingDialogState extends State<_WaitingDialog> {
         if (!_accepted)
           TextButton(
             onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+      ],
+    );
+  }
+}
+
+// ------------------------------------------------------------------ online
+/// Online: sends the challenge, waits for the friend to accept on their phone.
+Future<void> _startOnline(
+  BuildContext context,
+  ChatStore store,
+  Person friend,
+  GameInfo game,
+) async {
+  final online = store.online!;
+  final match = await online.challenge(friend, game);
+  if (match == null || !context.mounted) return;
+  final accepted = await showDialog<bool>(
+    context: context,
+    barrierDismissible: false,
+    builder: (ctx) =>
+        _OnlineWaitingDialog(online: online, match: match, friend: friend),
+  );
+  if (!context.mounted) return;
+  if (accepted == true) {
+    openMatch(context, store, match);
+  } else if (match.status == 'declined') {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          '${friend.firstName} declined',
+          style: tx(14, color: Colors.white),
+        ),
+      ),
+    );
+  }
+}
+
+/// Opens the game screen for an active online match.
+void openMatch(BuildContext context, ChatStore store, OnlineMatch m) {
+  final online = store.online!;
+  final friend = online.myId == m.challengerId ? m.opponent! : m.challenger!;
+  Navigator.of(context).push(
+    MaterialPageRoute(
+      builder: (_) => switch (m.gameId) {
+        'sudoku' => SudokuDuelScreen(
+          store: store,
+          friend: friend,
+          seed: 0,
+          match: m,
+        ),
+        _ => FourInRowScreen(store: store, friend: friend, match: m),
+      },
+    ),
+  );
+}
+
+/// A friend challenged me (live event): accept or decline.
+Future<void> showInvite(
+  BuildContext context,
+  ChatStore store,
+  OnlineMatch m,
+) async {
+  final online = store.online!;
+  final from = m.challenger!;
+  HapticFeedback.heavyImpact();
+  final accept = await showDialog<bool>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      backgroundColor: Colors.white,
+      contentPadding: const EdgeInsets.fromLTRB(24, 24, 24, 8),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              PersonAvatar(from, diameter: 52),
+              const SizedBox(width: 12),
+              const Icon(Icons.bolt_rounded, size: 30),
+              const SizedBox(width: 12),
+              _GameIcon(m.game, size: 52),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Text(
+            '${from.firstName} challenges you!',
+            textAlign: TextAlign.center,
+            style: tx(18, weight: FontWeight.w800),
+          ),
+          const SizedBox(height: 4),
+          Text(m.game.name, style: tx(14, color: AppColors.muted)),
+        ],
+      ),
+      actionsAlignment: MainAxisAlignment.center,
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(ctx, false),
+          child: const Text('Not now'),
+        ),
+        FilledButton(
+          style: FilledButton.styleFrom(backgroundColor: AppColors.ink),
+          onPressed: () => Navigator.pop(ctx, true),
+          child: const Text('Play'),
+        ),
+      ],
+    ),
+  );
+  if (accept == true) {
+    await online.accept(m);
+    if (context.mounted && m.status == 'active') openMatch(context, store, m);
+  } else if (accept == false) {
+    await online.decline(m);
+  }
+}
+
+class _OnlineWaitingDialog extends StatefulWidget {
+  const _OnlineWaitingDialog({
+    required this.online,
+    required this.match,
+    required this.friend,
+  });
+  final OnlineSync online;
+  final OnlineMatch match;
+  final Person friend;
+
+  @override
+  State<_OnlineWaitingDialog> createState() => _OnlineWaitingDialogState();
+}
+
+class _OnlineWaitingDialogState extends State<_OnlineWaitingDialog> {
+  @override
+  void initState() {
+    super.initState();
+    widget.match.addListener(_onChange);
+  }
+
+  @override
+  void dispose() {
+    widget.match.removeListener(_onChange);
+    super.dispose();
+  }
+
+  void _onChange() {
+    if (!mounted) return;
+    final s = widget.match.status;
+    if (s == 'active') {
+      setState(() {});
+      Future.delayed(const Duration(milliseconds: 600), () {
+        if (mounted) Navigator.pop(context, true);
+      });
+    } else if (s == 'declined' || s == 'cancelled') {
+      Navigator.pop(context, false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final accepted = widget.match.status == 'active';
+    return AlertDialog(
+      backgroundColor: Colors.white,
+      contentPadding: const EdgeInsets.fromLTRB(24, 24, 24, 8),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              _GameIcon(widget.match.game, size: 48),
+              const SizedBox(width: 12),
+              const Icon(Icons.bolt_rounded, size: 30),
+              const SizedBox(width: 12),
+              PersonAvatar(widget.friend, diameter: 48),
+            ],
+          ),
+          const SizedBox(height: 16),
+          AnimatedSwitcher(
+            duration: const Duration(milliseconds: 250),
+            child: Text(
+              accepted
+                  ? '${widget.friend.firstName} accepted!'
+                  : 'Waiting for ${widget.friend.firstName}…',
+              key: ValueKey(accepted),
+              style: tx(17, weight: FontWeight.w700),
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'They got a notification on their phone',
+            style: tx(12, color: AppColors.muted),
+          ),
+          const SizedBox(height: 16),
+          accepted
+              ? const Icon(
+                  Icons.check_circle,
+                  color: AppColors.online,
+                  size: 30,
+                )
+              : const LinearProgressIndicator(color: AppColors.ink),
+        ],
+      ),
+      actions: [
+        if (!accepted)
+          TextButton(
+            onPressed: () async {
+              await widget.online.decline(widget.match); // cancels my challenge
+              if (context.mounted) Navigator.pop(context, false);
+            },
             child: const Text('Cancel'),
           ),
       ],

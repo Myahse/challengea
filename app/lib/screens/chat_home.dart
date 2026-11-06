@@ -9,6 +9,7 @@ import '../models.dart';
 import '../theme.dart';
 import '../widgets/avatar.dart';
 import '../widgets/bubble_field.dart';
+import '../widgets/friends_sheet.dart';
 import 'chat_screen.dart';
 
 /// Figma: "Chat page" (node 28:144).
@@ -309,7 +310,13 @@ class _ChatHomeState extends State<ChatHome> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            _Header(me: store.me),
+            _Header(
+              me: store.me,
+              requests: store.online?.incoming.length ?? 0,
+              onFriends: store.online == null
+                  ? null
+                  : () => showFriendsSheet(context, store.online!),
+            ),
             const SizedBox(height: 14),
             _TalesRow(
               onPlay: (g) => challengeWithGame(context, store, g),
@@ -354,7 +361,9 @@ class _ChatHomeState extends State<ChatHome> {
                     child: _SpeedDial(
                       onMap: widget.onOpenMap,
                       onAddFriend: () {
-                        if (store.addFriend() == null) {
+                        if (store.online != null) {
+                          showFriendsSheet(context, store.online!);
+                        } else if (store.addFriend() == null) {
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
                               content: Text(
@@ -379,8 +388,10 @@ class _ChatHomeState extends State<ChatHome> {
 }
 
 class _Header extends StatelessWidget {
-  const _Header({required this.me});
+  const _Header({required this.me, this.requests = 0, this.onFriends});
   final Person me;
+  final int requests;
+  final VoidCallback? onFriends;
 
   @override
   Widget build(BuildContext context) {
@@ -425,6 +436,18 @@ class _Header extends StatelessWidget {
             ],
           ),
           const Spacer(),
+          if (onFriends != null) ...[
+            IconButton(
+              tooltip: 'Friends',
+              onPressed: onFriends,
+              icon: Badge(
+                isLabelVisible: requests > 0,
+                label: Text('$requests'),
+                child: const Icon(Icons.people_alt_outlined, size: 26),
+              ),
+            ),
+            const SizedBox(width: 4),
+          ],
           const Icon(Icons.card_giftcard_rounded, size: 24),
           const SizedBox(width: 12),
           const Icon(Icons.storefront_rounded, size: 24),
